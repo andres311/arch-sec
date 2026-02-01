@@ -24,11 +24,82 @@ DEFAULT_CONFIG = {
 }
 
 
+def get_current_network() -> str:
+    """Get the current network ID (SSID or Interface Name)."""
+    # Method 1: iwgetid (Fastest, reliable for wifi)
+    try:
+        result = subprocess.run(
+            ['iwgetid', '-r'], 
+            capture_output=True, 
+            text=True, 
+            timeout=2
+        )
+        ssid = result.stdout.strip()
+        if ssid:
+            return ssid
+    except Exception:
+        pass
+        
+    # Method 2: nmcli connection show --active (Robust for NetworkManager)
+    try:
+        result = subprocess.run(
+            ['nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show', '--active'],
+            capture_output=True, 
+            text=True, 
+            timeout=2
+        )
+        # Output format: Name:Type
+        # Priority: WiFi > Ethernet > Others
+        active_cons = []
+        for line in result.stdout.splitlines():
+            parts = line.split(':')
+            if len(parts) >= 2:
+                active_cons.append((parts[0], parts[1]))
+
+        # Check for WiFi
+        for name, type_ in active_cons:
+            if type_ in ['802-11-wireless', 'wifi', 'wlan']:
+                return name
+        
+        # Check for Wired/Ethernet (User requested custom interface names e.g. eth-data)
+        for name, type_ in active_cons:
+            if type_ in ['802-3-ethernet', 'ethernet', 'wired']:
+                return name
+        
+        # Fallback: Return first active connection
+        if active_cons:
+            return active_cons[0][0]
+            
+    except Exception:
+        pass
+
+    # Method 3: nmcli dev wifi (Legacy fallback)
+    try:
+        result = subprocess.run(
+            ['nmcli', '-t', '-f', 'ACTIVE,SSID', 'dev', 'wifi'],
+            capture_output=True, 
+            text=True, 
+            timeout=3
+        )
+        for line in result.stdout.splitlines():
+            if line.startswith('yes:'):
+                return line.split(':', 1)[1].strip()
+    except Exception:
+        pass
+    
+    return "Unknown_Network"
+
+
 def setup_logging(logs_dir: str) -> logging.Logger:
     """Setup logging to file and console."""
-    Path(logs_dir).mkdir(parents=True, exist_ok=True)
+    # Determine environment
+    current_network = get_current_network()
     
-    log_file = Path(logs_dir) / f"worker_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    # Update logs dir to include environment
+    env_logs_dir = Path(logs_dir) / current_network
+    env_logs_dir.mkdir(parents=True, exist_ok=True)
+    
+    log_file = env_logs_dir / f"worker_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
     
     logger = logging.getLogger('security_worker')
     logger.setLevel(logging.DEBUG)
@@ -79,7 +150,13 @@ def execute_script(script_path: Path, target: str, reports_dir: str, logger: log
     """Execute a security script and capture output."""
     script_name = script_path.stem
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    report_file = Path(reports_dir) / f"{script_name}_{timestamp}.txt"
+    
+    # Determine environment
+    current_network = get_current_network()
+    env_reports_dir = Path(reports_dir) / current_network
+    env_reports_dir.mkdir(parents=True, exist_ok=True)
+    
+    report_file = env_reports_dir / f"{script_name}_{timestamp}.txt"
     
     logger.info(f"{'[DRY-RUN] ' if dry_run else ''}Executing: {script_path.name} against target: {target}")
     
@@ -97,7 +174,9 @@ def execute_script(script_path: Path, target: str, reports_dir: str, logger: log
         )
         
         # Save output to report file
-        Path(reports_dir).mkdir(parents=True, exist_ok=True)
+        # Save output to report file
+        # Directory already created above
+        # Path(reports_dir).mkdir(parents=True, exist_ok=True)
         with open(report_file, 'w') as f:
             f.write(f"Security Scan Report\n")
             f.write(f"{'=' * 50}\n")

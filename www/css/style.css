@@ -189,6 +189,48 @@ body {
 .header-right {
     display: flex;
     gap: 12px;
+    align-items: center;
+}
+
+.env-selector-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-right: 12px;
+    background: var(--bg-card);
+    padding: 8px 12px;
+    border-radius: var(--border-radius-sm);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.env-label {
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.env-dropdown {
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    outline: none;
+    min-width: 150px;
+}
+
+.env-option-current {
+    color: var(--safe) !important;
+    font-weight: 700;
+}
+
+.env-option-records {
+    color: var(--accent-primary) !important;
+    font-weight: 600;
+}
+
+.env-option-available {
+    color: var(--text-primary) !important;
 }
 
 /* ===== Buttons ===== */

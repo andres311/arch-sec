@@ -12,7 +12,8 @@ let dashboardData = {
     stats: { critical: 0, high: 0, medium: 0, low: 0 },
     issues: [],
     networkNodes: [],
-    recentScans: []
+    recentScans: [],
+    currentEnv: null
 };
 
 let availableScripts = [];
@@ -59,7 +60,8 @@ const elements = {
     nodeContent: document.getElementById('node-content'),
     closePanelBtn: document.querySelector('.close-panel'),
     defaultTargetInput: document.getElementById('settings-default-target'),
-    saveSettingsBtn: document.getElementById('save-settings')
+    saveSettingsBtn: document.getElementById('save-settings'),
+    envSelect: document.getElementById('env-select')
 };
 
 // ===== API Functions =====
@@ -67,12 +69,16 @@ function filterIssuesBySeverity(severity) {
     // Navigate to issues section
     window.location.hash = 'issues';
 
+    // Clear search to avoid conflicting filters
+    if (elements.issueSearch) {
+        elements.issueSearch.value = '';
+    }
+
     // Set filter
     if (elements.severityFilter) {
         elements.severityFilter.value = severity;
-        // Trigger change event to update list
-        const event = new Event('change');
-        elements.severityFilter.dispatchEvent(event);
+        // Directly update the list
+        renderFullIssues();
     }
 }
 
@@ -93,12 +99,51 @@ async function fetchAPI(endpoint, options = {}) {
 }
 
 async function loadDashboardData() {
-    const data = await fetchAPI('/api/results');
+    // Load environment from URL if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const env = urlParams.get('env');
+
+    // Fetch data with env param
+    const endpoint = env ? `/api/results?env=${encodeURIComponent(env)}` : '/api/results';
+    const data = await fetchAPI(endpoint);
+
     if (data) {
         dashboardData = data;
         updateDashboard();
         renderFullIssues();
         renderReportsList();
+    }
+}
+
+async function loadEnvironments() {
+    const envs = await fetchAPI('/api/environments');
+    if (envs && elements.envSelect) {
+        // Determine selected env
+        const urlParams = new URLSearchParams(window.location.search);
+        const selectedEnv = urlParams.get('env') || (envs.find(e => e.is_current)?.name);
+
+        elements.envSelect.innerHTML = envs.map(env => {
+            let className = 'env-option-available';
+            let label = env.name;
+
+            if (env.is_current) {
+                className = 'env-option-current';
+                label += ' (Connected)';
+            } else if (env.has_records) {
+                className = 'env-option-records';
+            }
+
+            const isSelected = selectedEnv === env.name ? 'selected' : '';
+
+            return `<option value="${escapeHtml(env.name)}" class="${className}" ${isSelected}>${escapeHtml(label)}</option>`;
+        }).join('');
+
+        // Update URL if needed (without reload) but don't loop
+        // if (selectedEnv && !urlParams.get('env')) {
+        //    const newUrl = new URL(window.location);
+        //    newUrl.searchParams.set('env', selectedEnv);
+        //    window.history.pushState({}, '', newUrl);
+        // }
     }
 }
 
@@ -251,10 +296,13 @@ function renderFullIssues() {
     const severityFilter = elements.severityFilter.value;
 
     const filteredIssues = dashboardData.issues.filter(issue => {
-        const matchesSearch = issue.title.toLowerCase().includes(searchTerm) ||
-            issue.description.toLowerCase().includes(searchTerm) ||
-            issue.host.toLowerCase().includes(searchTerm);
-        const matchesSeverity = severityFilter === 'all' || issue.severity === severityFilter;
+        const issueSeverity = (issue.severity || 'low').toLowerCase();
+
+        const matchesSearch = (issue.title || '').toLowerCase().includes(searchTerm) ||
+            (issue.description || '').toLowerCase().includes(searchTerm) ||
+            (issue.host || '').toLowerCase().includes(searchTerm);
+
+        const matchesSeverity = severityFilter === 'all' || issueSeverity === severityFilter;
         return matchesSearch && matchesSeverity;
     });
 
@@ -358,7 +406,12 @@ function showNodeDetails(node) {
 async function renderReportsList() {
     if (!elements.reportsList) return;
 
-    const reports = await fetchAPI('/api/reports');
+    // Use current env from dashboard data or URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const env = urlParams.get('env');
+    const endpoint = env ? `/api/reports?env=${encodeURIComponent(env)}` : '/api/reports';
+
+    const reports = await fetchAPI(endpoint);
     if (!reports) return;
 
     if (reports.length === 0) {
@@ -419,6 +472,98 @@ function renderRecentScans(scans) {
             <span class="scan-status-badge ${scan.status}">${scan.status}</span>
         </div>
     `).join('');
+}
+
+
+// ===== Active Scans =====
+async function updateActiveScans() {
+    const scans = await fetchAPI('/api/scans');
+    if (!scans) return;
+
+    renderActiveScans(scans);
+}
+
+function renderActiveScans(scans) {
+    const activeScansContainer = document.getElementById('active-scans-container');
+    if (!activeScansContainer) {
+        // Create container if it doesn't exist (insert before recent scans)
+        const scansCard = document.querySelector('.scans-card');
+        if (scansCard) {
+            const newCard = document.createElement('div');
+            newCard.className = 'card active-scans-card';
+            newCard.style.marginBottom = '20px';
+            newCard.innerHTML = `
+                <h2 class="card-title">Active Scans</h2>
+                <div class="active-scans-list" id="active-scans-list"></div>
+            `;
+            scansCard.parentNode.insertBefore(newCard, scansCard);
+        }
+    }
+
+    const listElement = document.getElementById('active-scans-list');
+    if (!listElement) return;
+
+    const runningScans = scans.filter(s => s.status === 'running');
+
+    if (runningScans.length === 0) {
+        // If container exists but no running scans, maybe hide it?
+        // For now, let's just clear it or show "None"
+        listElement.innerHTML = '<p class="text-muted" style="padding:10px;font-size:0.9em;">No active scans running.</p>';
+        return;
+    }
+
+    listElement.innerHTML = runningScans.map(scan => {
+        const completed = scan.completed || 0;
+        const total = scan.total || 1;
+        const progress = Math.round((completed / total) * 100);
+
+        // Generate steps details
+        let stepsHtml = '';
+        if (scan.script_details && scan.script_details.length > 0) {
+            stepsHtml = `<div class="scan-steps" style="margin-top:10px;background:rgba(0,0,0,0.2);padding:10px;border-radius:6px;max-height:150px;overflow-y:auto;">
+                ${scan.script_details.map(script => `
+                    <div class="scan-step-item" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;font-size:0.85em;">
+                        <span style="color:${getStepColor(script.status)}">
+                            ${getStepIcon(script.status)} ${script.name}
+                        </span>
+                        <span style="opacity:0.7;font-size:0.8em;text-transform:capitalize;">${script.status}</span>
+                    </div>
+                `).join('')}
+             </div>`;
+        }
+
+        return `
+        <div class="active-scan-item" style="border:1px solid var(--border-color);border-radius:8px;padding:15px;margin-bottom:10px;background:rgba(255,255,255,0.02);">
+            <div class="scan-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <div>
+                    <h4 style="margin:0;font-size:1em;">Target: <span style="color:var(--primary-color);">${escapeHtml(scan.target)}</span></h4>
+                    <span style="font-size:0.8em;opacity:0.7;">Started: ${formatTime(scan.started)}</span>
+                </div>
+                <div class="scan-badge running">Running</div>
+            </div>
+            
+            <div class="progress-bar-container" style="height:6px;background:rgba(255,255,255,0.1);border-radius:3px;margin:10px 0;overflow:hidden;">
+                <div class="progress-bar" style="width:${progress}%;height:100%;background:var(--primary-color);transition:width 0.3s ease;"></div>
+            </div>
+            <div style="text-align:right;font-size:0.8em;margin-bottom:10px;">${completed}/${total} scripts completed</div>
+            
+            ${stepsHtml}
+        </div>
+    `}).join('');
+}
+
+function getStepIcon(status) {
+    if (status === 'completed') return '✅';
+    if (status === 'running') return '⏳';
+    if (status === 'failed') return '❌';
+    return '⚪';
+}
+
+function getStepColor(status) {
+    if (status === 'completed') return '#10b981';
+    if (status === 'running') return '#f59e0b';
+    if (status === 'failed') return '#ef4444';
+    return 'inherit';
 }
 
 // ===== Modal & Settings =====
@@ -537,9 +682,49 @@ elements.saveSettingsBtn?.addEventListener('click', () => {
     alert('Settings saved locally (simulation)');
 });
 
+elements.regenerateJsonBtn = document.getElementById('regenerate-json');
+elements.regenerateJsonBtn?.addEventListener('click', async () => {
+    const btn = elements.regenerateJsonBtn;
+    const originalText = btn.innerHTML;
+
+    btn.disabled = true;
+    btn.innerHTML = '<span>⏳</span> Regenerating...';
+
+    // Get current env
+    const urlParams = new URLSearchParams(window.location.search);
+    const env = urlParams.get('env');
+    const endpoint = env ? `/api/regenerate_json?env=${encodeURIComponent(env)}` : '/api/regenerate_json';
+
+    try {
+        const response = await fetchAPI(endpoint, { method: 'POST' });
+        if (response && response.status === 'success') {
+            alert('Success: scan_results.json has been regenerated with current data.');
+            // Reload data to reflect changes if any
+            await loadDashboardData();
+        } else {
+            alert('Error: Failed to regenerate JSON data.');
+        }
+    } catch (e) {
+        console.error(e);
+        alert('Error: Request failed.');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
+// Environment Switch
+elements.envSelect?.addEventListener('change', (e) => {
+    const env = e.target.value;
+    const newUrl = new URL(window.location);
+    newUrl.searchParams.set('env', env);
+    window.location.href = newUrl.toString();
+});
+
 // ===== Initialize =====
 async function initializeDashboard() {
     await loadScripts();
+    await loadEnvironments(); // Load environments first
     await loadDashboardData();
     handleRouting();
 
@@ -552,8 +737,13 @@ async function initializeDashboard() {
         }
     });
 
-    // Auto-refresh every 60 seconds
+    // Auto-refresh every 5 seconds for active scans (more frequent)
+    setInterval(updateActiveScans, 5000);
+    // Refresh full dashboard data every 60 seconds
     setInterval(loadDashboardData, 60000);
+
+    // Initial load
+    updateActiveScans();
 }
 
 document.addEventListener('DOMContentLoaded', initializeDashboard);
