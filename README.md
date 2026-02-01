@@ -17,6 +17,7 @@ Open your browser to: **[http://localhost:8080](http://localhost:8080)**
 - **📊 Risk Overview**: Real-time risk gauge and statistics.
 - **🌐 Network Map**: Interactive topology of discovered hosts.
 - **⚠️ Issues Explorer**: Filter findings by severity, host, or scanner.
+- **🌍 Multi-Environment**: Auto-detects network environment and organizes reports (Green=Current, Blue=History).
 - **🔍 Run Scans**: Execute security scripts directly from the UI.
 - **📋 Reports**: View raw output logs from all tools.
 

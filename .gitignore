@@ -1,3 +1,5 @@
 reports/
 logs/
 www/data
+__pycache__/
+c/

@@ -10,6 +10,7 @@ import json
 import subprocess
 import threading
 import glob
+import shutil
 from datetime import datetime
 from pathlib import Path
 from http.server import HTTPServer, SimpleHTTPRequestHandler
@@ -47,10 +48,16 @@ class APIHandler(SimpleHTTPRequestHandler):
             self.send_json({'status': 'running', 'timestamp': datetime.now().isoformat()})
         elif path == '/api/scripts':
             self.send_json(self.get_scripts())
+        elif path == '/api/environments':
+            self.send_json(self.get_environments())
         elif path == '/api/reports':
-            self.send_json(self.get_reports())
+            params = parse_qs(parsed.query)
+            env = params.get('env', [None])[0]
+            self.send_json(self.get_reports(env))
         elif path == '/api/results':
-            self.send_json(self.get_scan_results())
+            params = parse_qs(parsed.query)
+            env = params.get('env', [None])[0]
+            self.send_json(self.get_scan_results(env))
         elif path == '/api/scans':
             self.send_json(list(active_scans.values()))
         elif path.startswith('/api/report/'):
@@ -79,8 +86,22 @@ class APIHandler(SimpleHTTPRequestHandler):
         elif path == '/api/parse':
             result = self.parse_all_reports()
             self.send_json(result)
-        else:
-            self.send_error(404, 'Not Found')
+        elif path == '/api/regenerate_json':
+            try:
+                # Get environment from query params if needed, or default to current logic
+                # For this specific request, we want to regenerate the main file with *current* environment data
+                # But the file is static. Let's assume we want to dump the current env's results.
+                
+                # Check if specific env requested, otherwise use current detected
+                params = parse_qs(parsed.query)
+                env = params.get('env', [None])[0]
+                
+                # Get data - this method now handles saving to the correct file
+                data = self.get_scan_results(env)
+                
+                self.send_json({'status': 'success', 'message': 'scan_results parsed and regenerated'})
+            except Exception as e:
+                self.send_error(500, str(e))
     
     def send_json(self, data):
         """Send JSON response."""
@@ -109,29 +130,145 @@ class APIHandler(SimpleHTTPRequestHandler):
             })
         return sorted(scripts, key=lambda x: x['name'])
     
-    def get_reports(self):
-        """Get list of report files."""
-        reports = []
-        for report in REPORTS_DIR.glob('*.txt'):
-            stat = report.stat()
-            reports.append({
-                'name': report.name,
-                'size': stat.st_size,
-                'modified': datetime.fromtimestamp(stat.st_mtime).isoformat()
+    def get_current_network(self):
+        """Get the current network ID (SSID or Interface Name)."""
+        # Method 1: iwgetid (Fastest, reliable for wifi)
+        try:
+            result = subprocess.run(
+                ['iwgetid', '-r'], 
+                capture_output=True, 
+                text=True, 
+                timeout=2
+            )
+            ssid = result.stdout.strip()
+            if ssid:
+                return ssid
+        except Exception:
+            pass
+            
+        # Method 2: nmcli connection show --active (Robust for NetworkManager)
+        try:
+            result = subprocess.run(
+                ['nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show', '--active'],
+                capture_output=True, 
+                text=True, 
+                timeout=2
+            )
+            # Output format: Name:Type
+            # Priority: WiFi > Ethernet > Others
+            active_cons = []
+            for line in result.stdout.splitlines():
+                parts = line.split(':')
+                if len(parts) >= 2:
+                    active_cons.append((parts[0], parts[1]))
+
+            # Check for WiFi
+            for name, type_ in active_cons:
+                if type_ in ['802-11-wireless', 'wifi', 'wlan']:
+                    return name
+            
+            # Check for Wired/Ethernet (User requested custom interface names e.g. eth-data)
+            for name, type_ in active_cons:
+                if type_ in ['802-3-ethernet', 'ethernet', 'wired']:
+                    return name
+            
+            # Fallback: Return first active connection
+            if active_cons:
+                return active_cons[0][0]
+                
+        except Exception:
+            pass
+
+        # Method 3: nmcli dev wifi (Legacy fallback)
+        try:
+            result = subprocess.run(
+                ['nmcli', '-t', '-f', 'ACTIVE,SSID', 'dev', 'wifi'],
+                capture_output=True, 
+                text=True, 
+                timeout=3
+            )
+            for line in result.stdout.splitlines():
+                if line.startswith('yes:'):
+                    return line.split(':', 1)[1].strip()
+        except Exception:
+            pass
+        
+        return "Unknown_Network"
+
+    def get_environments(self):
+        """Get list of environments with status."""
+        current_net = self.get_current_network()
+        envs = []
+        
+        # Get all subdirectories in reports
+        existing_envs = set()
+        if REPORTS_DIR.exists():
+            for item in REPORTS_DIR.iterdir():
+                if item.is_dir():
+                    existing_envs.add(item.name)
+        
+        # Add current network if not exists
+        all_envs = existing_envs.union({current_net})
+        
+        # Available networks (visible via nmcli) - Optional enhancement
+        # For now, we'll stick to history + current
+        
+        for env_name in all_envs:
+            envs.append({
+                'name': env_name,
+                'is_current': env_name == current_net,
+                'has_records': env_name in existing_envs
             })
+            
+        return sorted(envs, key=lambda x: (not x['is_current'], x['name']))
+
+    def get_reports(self, environment=None):
+        """Get list of report files for a specific environment."""
+        reports = []
+        
+        # Determine target directory
+        if environment:
+            target_dir = REPORTS_DIR / environment
+        else:
+            # If no env specified, try to find default or root
+            target_dir = REPORTS_DIR
+            
+        if not target_dir.exists():
+            return []
+
+        # Recursively find txt files if we are at root, or just in the env folder
+        # For strict env support, we should only look in the env folder
+        
+        search_pattern = '*.txt'
+        for report in target_dir.glob(search_pattern):
+            if report.is_file():
+                stat = report.stat()
+                reports.append({
+                    'name': report.name,
+                    'size': stat.st_size,
+                    'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                    'environment': environment or 'root'
+                })
         return sorted(reports, key=lambda x: x['modified'], reverse=True)
     
     def get_report_content(self, report_name):
-        """Get content of a specific report."""
-        report_path = REPORTS_DIR / report_name
-        if report_path.exists():
+        """Get content of a specific report. Searches all envs."""
+        # This is a bit tricky if names differ across envs, but names have timestamps so should be unique-ish
+        # We'll search recursively
+        found_file = None
+        for path in REPORTS_DIR.rglob(report_name):
+            if path.is_file():
+                found_file = path
+                break
+        
+        if found_file:
             return {
                 'name': report_name,
-                'content': report_path.read_text(errors='ignore')
+                'content': found_file.read_text(errors='ignore')
             }
         return {'error': 'Report not found'}
     
-    def get_scan_results(self):
+    def get_scan_results(self, environment=None):
         """Parse reports and generate dashboard data."""
         results = {
             'riskScore': 0,
@@ -139,11 +276,21 @@ class APIHandler(SimpleHTTPRequestHandler):
             'issues': [],
             'networkNodes': [],
             'recentScans': [],
-            'lastUpdated': datetime.now().isoformat()
+            'lastUpdated': datetime.now().isoformat(),
+            'environment': environment or 'all'
         }
         
-        # Parse all report files
-        reports = list(REPORTS_DIR.glob('*.txt'))
+        # Parse reports
+        reports = []
+        if environment:
+             target_dir = REPORTS_DIR / environment
+             if target_dir.exists():
+                 reports = list(target_dir.glob('*.txt'))
+        else:
+             # Default behavior: perhaps show everything or just root?
+             # Let's show everything for now if no env specified, or handle as error
+             reports = list(REPORTS_DIR.rglob('*.txt'))
+
         hosts_found = set()
         
         for report in reports[:50]:  # Limit to 50 most recent
@@ -226,15 +373,34 @@ class APIHandler(SimpleHTTPRequestHandler):
             ]
         
         # Sort and limit
+        # Sort and limit
         results['issues'] = sorted(results['issues'], 
-            key=lambda x: {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}.get(x.get('severity', 'low'), 4))[:50]
+            key=lambda x: {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}.get(x.get('severity', 'low'), 4))
         results['recentScans'] = sorted(results['recentScans'], 
-            key=lambda x: x['timestamp'], reverse=True)[:10]
+            key=lambda x: x['timestamp'], reverse=True)[:20]
         
         # Save to data file for dashboard
-        data_file = DATA_DIR / 'scan_results.json'
-        with open(data_file, 'w') as f:
-            json.dump(results, f, indent=2)
+        # Sanitize environment name for filename
+        env_name = environment if environment else 'all'
+        env_safe = "".join([c for c in env_name if c.isalnum() or c in ('-', '_')]).strip()
+        if not env_safe:
+            env_safe = 'unknown'
+            
+        filename = f'scan_results_{env_safe}.json'
+        data_file = DATA_DIR / filename
+        
+        try:
+            with open(data_file, 'w') as f:
+                json.dump(results, f, indent=2)
+                
+            # Also update main scan_results.json if this is the 'all' or default environment
+            # This ensures backward compatibility
+            if env_safe == 'all' or (environment is None):
+                default_file = DATA_DIR / 'scan_results.json'
+                with open(default_file, 'w') as f:
+                    json.dump(results, f, indent=2)
+        except Exception as e:
+            print(f"Error saving JSON results: {e}")
         
         return results
     
@@ -454,26 +620,48 @@ class APIHandler(SimpleHTTPRequestHandler):
             # Default to a few quick scans
             scripts = ['nmap_scan.sh', 'whatweb_scan.sh']
         
-        scan_id = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        scan_id = f"scan_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.urandom(2).hex()}"
         
         # Run scans in background thread
         def run_scans():
+            # Initialize script details
+            script_details = []
+            for s in scripts:
+                script_details.append({
+                    'name': s,
+                    'status': 'pending'
+                })
+
             active_scans[scan_id] = {
                 'id': scan_id,
                 'status': 'running',
                 'target': target,
                 'scripts': scripts,
+                'script_details': script_details,
                 'started': datetime.now().isoformat(),
                 'completed': 0,
                 'total': len(scripts)
             }
             
-            for script in scripts:
+            for i, script in enumerate(scripts):
                 script_path = SCRIPTS_DIR / script
+                
+                # Update status to running
+                active_scans[scan_id]['script_details'][i]['status'] = 'running'
+                
                 if script_path.exists():
                     try:
+                        # Determine environment directory
+                        # Re-detect network for each script to ensure accuracy if moving
+                        current_network = self.get_current_network()
+                        
+                        env_dir = REPORTS_DIR / current_network
+                        env_dir.mkdir(exist_ok=True)
+                        
                         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                        output_file = REPORTS_DIR / f"{script_path.stem}_{timestamp}.txt"
+                        # Sanitize target for filename
+                        safe_target = "".join([c for c in target if c.isalnum() or c in ('-', '_', '.')]).strip()
+                        output_file = env_dir / f"{script_path.stem}_{safe_target}_{timestamp}.txt"
                         
                         result = subprocess.run(
                             [str(script_path), target],
@@ -492,8 +680,12 @@ class APIHandler(SimpleHTTPRequestHandler):
                                 f.write("\nErrors:\n" + result.stderr)
                         
                         active_scans[scan_id]['completed'] += 1
+                        active_scans[scan_id]['script_details'][i]['status'] = 'completed'
                     except Exception as e:
                         print(f"Error running {script}: {e}")
+                        active_scans[scan_id]['script_details'][i]['status'] = 'failed'
+                else:
+                     active_scans[scan_id]['script_details'][i]['status'] = 'skipped'
             
             active_scans[scan_id]['status'] = 'completed'
             active_scans[scan_id]['finished'] = datetime.now().isoformat()
@@ -520,7 +712,7 @@ def main():
     port = 8080
     
     print("=" * 60)
-    print("Arch-Sec API Server")
+    print("Arch-Sec API Server (Multi-Environment Supported)")
     print("=" * 60)
     print(f"Dashboard: http://localhost:{port}")
     print(f"API Endpoints:")
