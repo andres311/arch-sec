@@ -1,0 +1,17 @@
+# Security Scanner Configuration
+# ==============================
+
+# Directory containing security scripts to execute
+scripts_dir: scripts
+
+# Directory to save scan reports
+reports_dir: reports
+
+# Directory for worker logs
+logs_dir: logs
+
+# Interval between scans in continuous mode (seconds)
+scan_interval: 3600  # 1 hour
+
+# Default target if none specified via command line
+default_target: localhost

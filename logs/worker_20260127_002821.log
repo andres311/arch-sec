@@ -1,0 +1,78 @@
+2026-01-27 00:28:21,618 - INFO - ============================================================
+2026-01-27 00:28:21,619 - INFO - Security Scanner Worker Started
+2026-01-27 00:28:21,619 - INFO - Scripts Directory: scripts
+2026-01-27 00:28:21,619 - INFO - Reports Directory: reports
+2026-01-27 00:28:21,619 - INFO - Target: localhost
+2026-01-27 00:28:21,619 - INFO - Mode: Single Run
+2026-01-27 00:28:21,619 - INFO - DRY-RUN MODE - No scripts will be executed
+2026-01-27 00:28:21,619 - INFO - ============================================================
+2026-01-27 00:28:21,621 - INFO - Found 34 script(s) to execute
+2026-01-27 00:28:21,621 - INFO - [DRY-RUN] Executing: arpscan_scan.sh against target: localhost
+2026-01-27 00:28:21,621 - INFO - [DRY-RUN] Would save output to: reports/arpscan_scan_20260127_002821.txt
+2026-01-27 00:28:21,621 - INFO - [DRY-RUN] Executing: crackmapexec_scan.sh against target: localhost
+2026-01-27 00:28:21,622 - INFO - [DRY-RUN] Would save output to: reports/crackmapexec_scan_20260127_002821.txt
+2026-01-27 00:28:21,622 - INFO - [DRY-RUN] Executing: cutycapt_scan.sh against target: localhost
+2026-01-27 00:28:21,622 - INFO - [DRY-RUN] Would save output to: reports/cutycapt_scan_20260127_002821.txt
+2026-01-27 00:28:21,622 - INFO - [DRY-RUN] Executing: dirb_scan.sh against target: localhost
+2026-01-27 00:28:21,622 - INFO - [DRY-RUN] Would save output to: reports/dirb_scan_20260127_002821.txt
+2026-01-27 00:28:21,622 - INFO - [DRY-RUN] Executing: dnsenum_scan.sh against target: localhost
+2026-01-27 00:28:21,622 - INFO - [DRY-RUN] Would save output to: reports/dnsenum_scan_20260127_002821.txt
+2026-01-27 00:28:21,623 - INFO - [DRY-RUN] Executing: dnsrecon_scan.sh against target: localhost
+2026-01-27 00:28:21,623 - INFO - [DRY-RUN] Would save output to: reports/dnsrecon_scan_20260127_002821.txt
+2026-01-27 00:28:21,623 - INFO - [DRY-RUN] Executing: enum4linux_scan.sh against target: localhost
+2026-01-27 00:28:21,623 - INFO - [DRY-RUN] Would save output to: reports/enum4linux_scan_20260127_002821.txt
+2026-01-27 00:28:21,623 - INFO - [DRY-RUN] Executing: eyewitness_scan.sh against target: localhost
+2026-01-27 00:28:21,624 - INFO - [DRY-RUN] Would save output to: reports/eyewitness_scan_20260127_002821.txt
+2026-01-27 00:28:21,624 - INFO - [DRY-RUN] Executing: fierce_scan.sh against target: localhost
+2026-01-27 00:28:21,624 - INFO - [DRY-RUN] Would save output to: reports/fierce_scan_20260127_002821.txt
+2026-01-27 00:28:21,624 - INFO - [DRY-RUN] Executing: fping_scan.sh against target: localhost
+2026-01-27 00:28:21,624 - INFO - [DRY-RUN] Would save output to: reports/fping_scan_20260127_002821.txt
+2026-01-27 00:28:21,624 - INFO - [DRY-RUN] Executing: gobuster_scan.sh against target: localhost
+2026-01-27 00:28:21,625 - INFO - [DRY-RUN] Would save output to: reports/gobuster_scan_20260127_002821.txt
+2026-01-27 00:28:21,626 - INFO - [DRY-RUN] Executing: host_scan.sh against target: localhost
+2026-01-27 00:28:21,626 - INFO - [DRY-RUN] Would save output to: reports/host_scan_20260127_002821.txt
+2026-01-27 00:28:21,626 - INFO - [DRY-RUN] Executing: hping3_scan.sh against target: localhost
+2026-01-27 00:28:21,627 - INFO - [DRY-RUN] Would save output to: reports/hping3_scan_20260127_002821.txt
+2026-01-27 00:28:21,629 - INFO - [DRY-RUN] Executing: hydra_scan.sh against target: localhost
+2026-01-27 00:28:21,629 - INFO - [DRY-RUN] Would save output to: reports/hydra_scan_20260127_002821.txt
+2026-01-27 00:28:21,629 - INFO - [DRY-RUN] Executing: lynis_audit.sh against target: localhost
+2026-01-27 00:28:21,630 - INFO - [DRY-RUN] Would save output to: reports/lynis_audit_20260127_002821.txt
+2026-01-27 00:28:21,630 - INFO - [DRY-RUN] Executing: masscan_scan.sh against target: localhost
+2026-01-27 00:28:21,630 - INFO - [DRY-RUN] Would save output to: reports/masscan_scan_20260127_002821.txt
+2026-01-27 00:28:21,630 - INFO - [DRY-RUN] Executing: medusa_scan.sh against target: localhost
+2026-01-27 00:28:21,630 - INFO - [DRY-RUN] Would save output to: reports/medusa_scan_20260127_002821.txt
+2026-01-27 00:28:21,630 - INFO - [DRY-RUN] Executing: ncrack_scan.sh against target: localhost
+2026-01-27 00:28:21,630 - INFO - [DRY-RUN] Would save output to: reports/ncrack_scan_20260127_002821.txt
+2026-01-27 00:28:21,630 - INFO - [DRY-RUN] Executing: netdiscover_scan.sh against target: localhost
+2026-01-27 00:28:21,631 - INFO - [DRY-RUN] Would save output to: reports/netdiscover_scan_20260127_002821.txt
+2026-01-27 00:28:21,631 - INFO - [DRY-RUN] Executing: nikto_scan.sh against target: localhost
+2026-01-27 00:28:21,631 - INFO - [DRY-RUN] Would save output to: reports/nikto_scan_20260127_002821.txt
+2026-01-27 00:28:21,631 - INFO - [DRY-RUN] Executing: nmap_scan.sh against target: localhost
+2026-01-27 00:28:21,631 - INFO - [DRY-RUN] Would save output to: reports/nmap_scan_20260127_002821.txt
+2026-01-27 00:28:21,631 - INFO - [DRY-RUN] Executing: onesixtyone_scan.sh against target: localhost
+2026-01-27 00:28:21,631 - INFO - [DRY-RUN] Would save output to: reports/onesixtyone_scan_20260127_002821.txt
+2026-01-27 00:28:21,631 - INFO - [DRY-RUN] Executing: searchsploit_scan.sh against target: localhost
+2026-01-27 00:28:21,632 - INFO - [DRY-RUN] Would save output to: reports/searchsploit_scan_20260127_002821.txt
+2026-01-27 00:28:21,632 - INFO - [DRY-RUN] Executing: smbclient_scan.sh against target: localhost
+2026-01-27 00:28:21,632 - INFO - [DRY-RUN] Would save output to: reports/smbclient_scan_20260127_002821.txt
+2026-01-27 00:28:21,632 - INFO - [DRY-RUN] Executing: smbmap_scan.sh against target: localhost
+2026-01-27 00:28:21,632 - INFO - [DRY-RUN] Would save output to: reports/smbmap_scan_20260127_002821.txt
+2026-01-27 00:28:21,632 - INFO - [DRY-RUN] Executing: snmpwalk_scan.sh against target: localhost
+2026-01-27 00:28:21,632 - INFO - [DRY-RUN] Would save output to: reports/snmpwalk_scan_20260127_002821.txt
+2026-01-27 00:28:21,632 - INFO - [DRY-RUN] Executing: sqlmap_scan.sh against target: localhost
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Would save output to: reports/sqlmap_scan_20260127_002821.txt
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Executing: sslscan_check.sh against target: localhost
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Would save output to: reports/sslscan_check_20260127_002821.txt
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Executing: sslyze_scan.sh against target: localhost
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Would save output to: reports/sslyze_scan_20260127_002821.txt
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Executing: wafw00f_scan.sh against target: localhost
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Would save output to: reports/wafw00f_scan_20260127_002821.txt
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Executing: wfuzz_scan.sh against target: localhost
+2026-01-27 00:28:21,633 - INFO - [DRY-RUN] Would save output to: reports/wfuzz_scan_20260127_002821.txt
+2026-01-27 00:28:21,634 - INFO - [DRY-RUN] Executing: whatweb_scan.sh against target: localhost
+2026-01-27 00:28:21,634 - INFO - [DRY-RUN] Would save output to: reports/whatweb_scan_20260127_002821.txt
+2026-01-27 00:28:21,634 - INFO - [DRY-RUN] Executing: wpscan_scan.sh against target: localhost
+2026-01-27 00:28:21,634 - INFO - [DRY-RUN] Would save output to: reports/wpscan_scan_20260127_002821.txt
+2026-01-27 00:28:21,634 - INFO - [DRY-RUN] Executing: xsser_scan.sh against target: localhost
+2026-01-27 00:28:21,634 - INFO - [DRY-RUN] Would save output to: reports/xsser_scan_20260127_002821.txt
+2026-01-27 00:28:21,634 - INFO - Worker finished

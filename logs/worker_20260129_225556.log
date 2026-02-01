@@ -1,0 +1,77 @@
+2026-01-29 22:55:56,098 - INFO - ============================================================
+2026-01-29 22:55:56,098 - INFO - Security Scanner Worker Started
+2026-01-29 22:55:56,098 - INFO - Scripts Directory: scripts
+2026-01-29 22:55:56,098 - INFO - Reports Directory: reports
+2026-01-29 22:55:56,098 - INFO - Target: localhost
+2026-01-29 22:55:56,099 - INFO - Mode: Single Run
+2026-01-29 22:55:56,099 - INFO - ============================================================
+2026-01-29 22:55:56,100 - INFO - Found 34 script(s) to execute
+2026-01-29 22:55:56,100 - INFO - Executing: arpscan_scan.sh against target: localhost
+2026-01-29 22:55:56,112 - WARNING - ⚠ Script arpscan_scan.sh exited with code 1
+2026-01-29 22:55:56,112 - INFO - Executing: crackmapexec_scan.sh against target: localhost
+2026-01-29 22:55:58,656 - INFO - ✓ Completed: crackmapexec_scan.sh - Report saved to reports/crackmapexec_scan_20260129_225556.txt
+2026-01-29 22:55:58,656 - INFO - Executing: cutycapt_scan.sh against target: localhost
+2026-01-29 22:56:00,036 - INFO - ✓ Completed: cutycapt_scan.sh - Report saved to reports/cutycapt_scan_20260129_225558.txt
+2026-01-29 22:56:00,036 - INFO - Executing: dirb_scan.sh against target: localhost
+2026-01-29 22:56:00,214 - INFO - ✓ Completed: dirb_scan.sh - Report saved to reports/dirb_scan_20260129_225600.txt
+2026-01-29 22:56:00,214 - INFO - Executing: dnsenum_scan.sh against target: localhost
+2026-01-29 22:59:38,781 - INFO - ✓ Completed: dnsenum_scan.sh - Report saved to reports/dnsenum_scan_20260129_225600.txt
+2026-01-29 22:59:38,781 - INFO - Executing: dnsrecon_scan.sh against target: localhost
+2026-01-29 23:00:29,534 - INFO - ✓ Completed: dnsrecon_scan.sh - Report saved to reports/dnsrecon_scan_20260129_225938.txt
+2026-01-29 23:00:29,534 - INFO - Executing: enum4linux_scan.sh against target: localhost
+2026-01-29 23:00:49,902 - INFO - ✓ Completed: enum4linux_scan.sh - Report saved to reports/enum4linux_scan_20260129_230029.txt
+2026-01-29 23:00:49,903 - INFO - Executing: eyewitness_scan.sh against target: localhost
+2026-01-29 23:00:49,913 - WARNING - ⚠ Script eyewitness_scan.sh exited with code 1
+2026-01-29 23:00:49,913 - INFO - Executing: fierce_scan.sh against target: localhost
+2026-01-29 23:05:06,440 - INFO - ✓ Completed: fierce_scan.sh - Report saved to reports/fierce_scan_20260129_230049.txt
+2026-01-29 23:05:06,440 - INFO - Executing: fping_scan.sh against target: localhost
+2026-01-29 23:05:06,448 - INFO - ✓ Completed: fping_scan.sh - Report saved to reports/fping_scan_20260129_230506.txt
+2026-01-29 23:05:06,448 - INFO - Executing: gobuster_scan.sh against target: localhost
+2026-01-29 23:05:06,502 - INFO - ✓ Completed: gobuster_scan.sh - Report saved to reports/gobuster_scan_20260129_230506.txt
+2026-01-29 23:05:06,502 - INFO - Executing: host_scan.sh against target: localhost
+2026-01-29 23:05:11,599 - INFO - ✓ Completed: host_scan.sh - Report saved to reports/host_scan_20260129_230506.txt
+2026-01-29 23:05:11,599 - INFO - Executing: hping3_scan.sh against target: localhost
+2026-01-29 23:05:11,603 - WARNING - ⚠ Script hping3_scan.sh exited with code 1
+2026-01-29 23:05:11,604 - INFO - Executing: hydra_scan.sh against target: localhost
+2026-01-29 23:05:11,611 - INFO - ✓ Completed: hydra_scan.sh - Report saved to reports/hydra_scan_20260129_230511.txt
+2026-01-29 23:05:11,611 - INFO - Executing: lynis_audit.sh against target: localhost
+2026-01-29 23:05:11,618 - WARNING - ⚠ Script lynis_audit.sh exited with code 1
+2026-01-29 23:05:11,618 - INFO - Executing: masscan_scan.sh against target: localhost
+2026-01-29 23:05:11,625 - WARNING - ⚠ Script masscan_scan.sh exited with code 1
+2026-01-29 23:05:11,625 - INFO - Executing: medusa_scan.sh against target: localhost
+2026-01-29 23:05:11,746 - INFO - ✓ Completed: medusa_scan.sh - Report saved to reports/medusa_scan_20260129_230511.txt
+2026-01-29 23:05:11,746 - INFO - Executing: ncrack_scan.sh against target: localhost
+2026-01-29 23:05:11,752 - INFO - ✓ Completed: ncrack_scan.sh - Report saved to reports/ncrack_scan_20260129_230511.txt
+2026-01-29 23:05:11,752 - INFO - Executing: netdiscover_scan.sh against target: localhost
+2026-01-29 23:05:11,758 - WARNING - ⚠ Script netdiscover_scan.sh exited with code 1
+2026-01-29 23:05:11,758 - INFO - Executing: nikto_scan.sh against target: localhost
+2026-01-29 23:05:12,304 - INFO - ✓ Completed: nikto_scan.sh - Report saved to reports/nikto_scan_20260129_230511.txt
+2026-01-29 23:05:12,305 - INFO - Executing: nmap_scan.sh against target: localhost
+2026-01-29 23:05:20,383 - INFO - ✓ Completed: nmap_scan.sh - Report saved to reports/nmap_scan_20260129_230512.txt
+2026-01-29 23:05:20,383 - INFO - Executing: onesixtyone_scan.sh against target: localhost
+2026-01-29 23:05:20,397 - INFO - ✓ Completed: onesixtyone_scan.sh - Report saved to reports/onesixtyone_scan_20260129_230520.txt
+2026-01-29 23:05:20,397 - INFO - Executing: searchsploit_scan.sh against target: localhost
+2026-01-29 23:05:20,620 - INFO - ✓ Completed: searchsploit_scan.sh - Report saved to reports/searchsploit_scan_20260129_230520.txt
+2026-01-29 23:05:20,620 - INFO - Executing: smbclient_scan.sh against target: localhost
+2026-01-29 23:05:20,691 - INFO - ✓ Completed: smbclient_scan.sh - Report saved to reports/smbclient_scan_20260129_230520.txt
+2026-01-29 23:05:20,692 - INFO - Executing: smbmap_scan.sh against target: localhost
+2026-01-29 23:05:21,604 - INFO - ✓ Completed: smbmap_scan.sh - Report saved to reports/smbmap_scan_20260129_230520.txt
+2026-01-29 23:05:21,604 - INFO - Executing: snmpwalk_scan.sh against target: localhost
+2026-01-29 23:05:27,641 - INFO - ✓ Completed: snmpwalk_scan.sh - Report saved to reports/snmpwalk_scan_20260129_230521.txt
+2026-01-29 23:05:27,641 - INFO - Executing: sqlmap_scan.sh against target: localhost
+2026-01-29 23:05:28,702 - INFO - ✓ Completed: sqlmap_scan.sh - Report saved to reports/sqlmap_scan_20260129_230527.txt
+2026-01-29 23:05:28,702 - INFO - Executing: sslscan_check.sh against target: localhost
+2026-01-29 23:05:28,719 - INFO - ✓ Completed: sslscan_check.sh - Report saved to reports/sslscan_check_20260129_230528.txt
+2026-01-29 23:05:28,719 - INFO - Executing: sslyze_scan.sh against target: localhost
+2026-01-29 23:05:29,554 - INFO - ✓ Completed: sslyze_scan.sh - Report saved to reports/sslyze_scan_20260129_230528.txt
+2026-01-29 23:05:29,554 - INFO - Executing: wafw00f_scan.sh against target: localhost
+2026-01-29 23:05:29,869 - INFO - ✓ Completed: wafw00f_scan.sh - Report saved to reports/wafw00f_scan_20260129_230529.txt
+2026-01-29 23:05:29,869 - INFO - Executing: wfuzz_scan.sh against target: localhost
+2026-01-29 23:05:30,765 - INFO - ✓ Completed: wfuzz_scan.sh - Report saved to reports/wfuzz_scan_20260129_230529.txt
+2026-01-29 23:05:30,765 - INFO - Executing: whatweb_scan.sh against target: localhost
+2026-01-29 23:05:32,659 - INFO - ✓ Completed: whatweb_scan.sh - Report saved to reports/whatweb_scan_20260129_230530.txt
+2026-01-29 23:05:32,659 - INFO - Executing: wpscan_scan.sh against target: localhost
+2026-01-29 23:05:34,460 - INFO - ✓ Completed: wpscan_scan.sh - Report saved to reports/wpscan_scan_20260129_230532.txt
+2026-01-29 23:05:34,460 - INFO - Executing: xsser_scan.sh against target: localhost
+2026-01-29 23:05:34,466 - WARNING - ⚠ Script xsser_scan.sh exited with code 1
+2026-01-29 23:05:34,466 - INFO - Worker finished

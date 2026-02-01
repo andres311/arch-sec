@@ -1,0 +1,14 @@
+2026-01-27 00:15:21,803 - INFO - ============================================================
+2026-01-27 00:15:21,804 - INFO - Security Scanner Worker Started
+2026-01-27 00:15:21,804 - INFO - Scripts Directory: scripts
+2026-01-27 00:15:21,804 - INFO - Reports Directory: reports
+2026-01-27 00:15:21,804 - INFO - Target: localhost
+2026-01-27 00:15:21,804 - INFO - Mode: Single Run
+2026-01-27 00:15:21,804 - INFO - DRY-RUN MODE - No scripts will be executed
+2026-01-27 00:15:21,804 - INFO - ============================================================
+2026-01-27 00:15:21,805 - INFO - Found 2 script(s) to execute
+2026-01-27 00:15:21,805 - INFO - [DRY-RUN] Executing: nikto_scan.sh against target: localhost
+2026-01-27 00:15:21,805 - INFO - [DRY-RUN] Would save output to: reports/nikto_scan_20260127_001521.txt
+2026-01-27 00:15:21,806 - INFO - [DRY-RUN] Executing: nmap_scan.sh against target: localhost
+2026-01-27 00:15:21,806 - INFO - [DRY-RUN] Would save output to: reports/nmap_scan_20260127_001521.txt
+2026-01-27 00:15:21,806 - INFO - Worker finished

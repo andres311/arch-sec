@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arch-Sec | Security Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <div class="logo-icon">🛡️</div>
+            <span>Arch-Sec</span>
+        </div>
+        <nav class="nav-menu">
+            <a href="#" class="nav-item active" data-section="dashboard">
+                <span class="nav-icon">📊</span>
+                <span>Dashboard</span>
+            </a>
+            <a href="#" class="nav-item" data-section="issues">
+                <span class="nav-icon">⚠️</span>
+                <span>Issues</span>
+            </a>
+            <a href="#" class="nav-item" data-section="network">
+                <span class="nav-icon">🌐</span>
+                <span>Network</span>
+            </a>
+            <a href="#" class="nav-item" data-section="reports">
+                <span class="nav-icon">📋</span>
+                <span>Reports</span>
+            </a>
+            <a href="#" class="nav-item" data-section="settings">
+                <span class="nav-icon">⚙️</span>
+                <span>Settings</span>
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <div class="scan-status">
+                <div class="status-indicator"></div>
+                <span>Last scan: <span id="last-scan">Never</span></span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <h1>Security Dashboard</h1>
+                <p class="subtitle">Network Security Overview</p>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-primary" id="run-scan">
+                    <span>▶</span> Run Scan
+                </button>
+                <button class="btn btn-secondary" id="refresh-data">
+                    <span>🔄</span> Refresh
+                </button>
+            </div>
+        </header>
+
+        <!-- Sections -->
+        <div id="sections-container">
+            <!-- Dashboard Section -->
+            <section id="section-dashboard" class="content-section active">
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card critical">
+                        <div class="stat-icon">🔴</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="critical-count">0</span>
+                            <span class="stat-label">Critical</span>
+                        </div>
+                    </div>
+                    <div class="stat-card high">
+                        <div class="stat-icon">🟠</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="high-count">0</span>
+                            <span class="stat-label">High</span>
+                        </div>
+                    </div>
+                    <div class="stat-card medium">
+                        <div class="stat-icon">🟡</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="medium-count">0</span>
+                            <span class="stat-label">Medium</span>
+                        </div>
+                    </div>
+                    <div class="stat-card low">
+                        <div class="stat-icon">🔵</div>
+                        <div class="stat-info">
+                            <span class="stat-value" id="low-count">0</span>
+                            <span class="stat-label">Low</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Dashboard Grid -->
+                <div class="dashboard-grid">
+                    <!-- Risk Gauge -->
+                    <div class="card risk-gauge-card">
+                        <h2 class="card-title">Overall Risk Score</h2>
+                        <div class="risk-gauge-container">
+                            <svg class="risk-gauge" viewBox="0 0 200 120">
+                                <defs>
+                                    <linearGradient id="gaugeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                        <stop offset="0%" style="stop-color:#10b981" />
+                                        <stop offset="50%" style="stop-color:#f59e0b" />
+                                        <stop offset="100%" style="stop-color:#ef4444" />
+                                    </linearGradient>
+                                </defs>
+                                <path class="gauge-bg" d="M 20 100 A 80 80 0 0 1 180 100" fill="none" stroke="#2d3748"
+                                    stroke-width="12" stroke-linecap="round" />
+                                <path class="gauge-fill" d="M 20 100 A 80 80 0 0 1 180 100" fill="none"
+                                    stroke="url(#gaugeGradient)" stroke-width="12" stroke-linecap="round" />
+                                <g class="gauge-needle" transform="rotate(0, 100, 100)">
+                                    <line x1="100" y1="100" x2="100" y2="35" stroke="#fff" stroke-width="3"
+                                        stroke-linecap="round" />
+                                    <circle cx="100" cy="100" r="8" fill="#fff" />
+                                </g>
+                            </svg>
+                            <div class="risk-score">
+                                <span class="score-value" id="risk-score">0</span>
+                                <span class="score-label" id="risk-label">Low Risk</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Network Mini Map -->
+                    <div class="card network-map-card">
+                        <h2 class="card-title">Network Risk Map</h2>
+                        <div class="network-map" id="network-map"></div>
+                        <div class="map-legend">
+                            <div class="legend-item"><span class="legend-dot critical"></span> Critical</div>
+                            <div class="legend-item"><span class="legend-dot high"></span> High</div>
+                            <div class="legend-item"><span class="legend-dot medium"></span> Medium</div>
+                            <div class="legend-item"><span class="legend-dot low"></span> Low</div>
+                            <div class="legend-item"><span class="legend-dot safe"></span> Safe</div>
+                        </div>
+                    </div>
+
+                    <!-- Security Issues Preview -->
+                    <div class="card issues-card">
+                        <h2 class="card-title">Security Issues</h2>
+                        <div class="issues-list" id="issues-list">
+                            <div class="no-issues">
+                                <span class="no-issues-icon">✅</span>
+                                <p>No issues found.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Scans Preview -->
+                    <div class="card scans-card">
+                        <h2 class="card-title">Recent Scans</h2>
+                        <div class="scans-list" id="scans-list">
+                            <div class="no-scans">
+                                <span class="no-scans-icon">📋</span>
+                                <p>No scans yet.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Issues Section -->
+            <section id="section-issues" class="content-section">
+                <div class="card full-height-card">
+                    <div class="card-header-flex">
+                        <h2 class="card-title">All Security Issues</h2>
+                        <div class="filter-controls">
+                            <input type="text" id="issue-search" placeholder="Search issues..." class="search-input">
+                            <select id="severity-filter" class="filter-select">
+                                <option value="all">All Severities</option>
+                                <option value="critical">Critical</option>
+                                <option value="high">High</option>
+                                <option value="medium">Medium</option>
+                                <option value="low">Low</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="issues-table-container">
+                        <table class="data-table" id="full-issues-table">
+                            <thead>
+                                <tr>
+                                    <th>Severity</th>
+                                    <th>Title</th>
+                                    <th>Host</th>
+                                    <th>Scanner</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="full-issues-list">
+                                <!-- Populated by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Network Section -->
+            <section id="section-network" class="content-section">
+                <div class="card full-height-card">
+                    <h2 class="card-title">Network Topology explorer</h2>
+                    <div class="network-map large" id="full-network-map"></div>
+                    <div id="node-details-panel" class="details-panel hidden">
+                        <div class="panel-header">
+                            <h3>Host Details</h3>
+                            <button class="close-panel">&times;</button>
+                        </div>
+                        <div id="node-content"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Reports Section -->
+            <section id="section-reports" class="content-section">
+                <div class="card full-height-card">
+                    <h2 class="card-title">Scan Reports</h2>
+                    <div class="reports-container">
+                        <div class="reports-sidebar" id="reports-list">
+                            <!-- Populated by JS -->
+                        </div>
+                        <div class="report-viewer" id="report-viewer">
+                            <div class="viewer-placeholder">
+                                <span class="placeholder-icon">📄</span>
+                                <p>Select a report to view details</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="section-settings" class="content-section">
+                <div class="card">
+                    <h2 class="card-title">System Settings</h2>
+                    <div class="settings-grid">
+                        <div class="form-group">
+                            <label>Default Target</label>
+                            <input type="text" id="settings-default-target" value="127.0.0.1">
+                        </div>
+                        <div class="form-group">
+                            <label>API Key (Optional)</label>
+                            <input type="password" id="settings-api-key" placeholder="••••••••">
+                        </div>
+                        <button class="btn btn-primary" id="save-settings">Save Changes</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
+
+    <!-- Scan Modal -->
+    <div class="modal" id="scan-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Run Security Scan</h2>
+                <button class="modal-close" id="close-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="target-input">Target (IP or hostname)</label>
+                    <input type="text" id="target-input" placeholder="192.168.1.1 or example.com">
+                </div>
+                <div class="form-group">
+                    <label>Select Scripts</label>
+                    <div class="script-checkboxes" id="script-checkboxes">
+                        <!-- Script checkboxes will be rendered here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-scan">Cancel</button>
+                <button class="btn btn-primary" id="start-scan">Start Scan</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+
+</html>
