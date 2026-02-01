@@ -22,6 +22,13 @@ const elements = {
     riskScore: document.getElementById('risk-score'),
     riskLabel: document.getElementById('risk-label'),
     gaugeNeedle: document.querySelector('.gauge-needle'),
+
+    // Stats Cards
+    statCardCritical: document.querySelector('.stat-card.critical'),
+    statCardHigh: document.querySelector('.stat-card.high'),
+    statCardMedium: document.querySelector('.stat-card.medium'),
+    statCardLow: document.querySelector('.stat-card.low'),
+
     criticalCount: document.getElementById('critical-count'),
     highCount: document.getElementById('high-count'),
     mediumCount: document.getElementById('medium-count'),
@@ -56,6 +63,19 @@ const elements = {
 };
 
 // ===== API Functions =====
+function filterIssuesBySeverity(severity) {
+    // Navigate to issues section
+    window.location.hash = 'issues';
+
+    // Set filter
+    if (elements.severityFilter) {
+        elements.severityFilter.value = severity;
+        // Trigger change event to update list
+        const event = new Event('change');
+        elements.severityFilter.dispatchEvent(event);
+    }
+}
+
 async function fetchAPI(endpoint, options = {}) {
     try {
         const response = await fetch(`${API_BASE}${endpoint}`, {
@@ -505,6 +525,12 @@ elements.severityFilter?.addEventListener('change', renderFullIssues);
 elements.closePanelBtn?.addEventListener('click', () => {
     elements.nodeDetailsPanel.classList.add('hidden');
 });
+
+// Stats Card Click Handlers
+elements.statCardCritical?.addEventListener('click', () => filterIssuesBySeverity('critical'));
+elements.statCardHigh?.addEventListener('click', () => filterIssuesBySeverity('high'));
+elements.statCardMedium?.addEventListener('click', () => filterIssuesBySeverity('medium'));
+elements.statCardLow?.addEventListener('click', () => filterIssuesBySeverity('low'));
 
 // Settings
 elements.saveSettingsBtn?.addEventListener('click', () => {
