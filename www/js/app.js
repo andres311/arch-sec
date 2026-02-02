@@ -61,7 +61,15 @@ const elements = {
     closePanelBtn: document.querySelector('.close-panel'),
     defaultTargetInput: document.getElementById('settings-default-target'),
     saveSettingsBtn: document.getElementById('save-settings'),
-    envSelect: document.getElementById('env-select')
+    envSelect: document.getElementById('env-select'),
+
+    // Discovery Elements
+    fastDiscoveryBtn: document.getElementById('fast-discovery'),
+    discoveryModal: document.getElementById('discovery-modal'),
+    closeDiscoveryModalBtn: document.getElementById('close-discovery-modal'),
+    cancelDiscoveryBtn: document.getElementById('cancel-discovery'),
+    startDiscoveryBtn: document.getElementById('start-discovery'),
+    discoveryTarget: document.getElementById('discovery-target')
 };
 
 // ===== API Functions =====
@@ -98,10 +106,10 @@ async function fetchAPI(endpoint, options = {}) {
     }
 }
 
-async function loadDashboardData() {
-    // Load environment from URL if present
+async function loadDashboardData(envOverride = null) {
+    // Load environment from URL if present, or use override
     const urlParams = new URLSearchParams(window.location.search);
-    const env = urlParams.get('env');
+    const env = envOverride || urlParams.get('env');
 
     // Fetch data with env param
     const endpoint = env ? `/api/results?env=${encodeURIComponent(env)}` : '/api/results';
@@ -117,10 +125,12 @@ async function loadDashboardData() {
 
 async function loadEnvironments() {
     const envs = await fetchAPI('/api/environments');
+    let selectedEnv = null;
+
     if (envs && elements.envSelect) {
         // Determine selected env
         const urlParams = new URLSearchParams(window.location.search);
-        const selectedEnv = urlParams.get('env') || (envs.find(e => e.is_current)?.name);
+        selectedEnv = urlParams.get('env') || (envs.find(e => e.is_current)?.name);
 
         elements.envSelect.innerHTML = envs.map(env => {
             let className = 'env-option-available';
@@ -137,14 +147,10 @@ async function loadEnvironments() {
 
             return `<option value="${escapeHtml(env.name)}" class="${className}" ${isSelected}>${escapeHtml(label)}</option>`;
         }).join('');
-
-        // Update URL if needed (without reload) but don't loop
-        // if (selectedEnv && !urlParams.get('env')) {
-        //    const newUrl = new URL(window.location);
-        //    newUrl.searchParams.set('env', selectedEnv);
-        //    window.history.pushState({}, '', newUrl);
-        // }
     }
+
+    // Return the selected environment for use by other functions
+    return selectedEnv;
 }
 
 async function loadScripts() {
@@ -154,10 +160,10 @@ async function loadScripts() {
     }
 }
 
-async function startScanAPI(target, scripts) {
+async function startScanAPI(target, scripts, discover, discoveryOnly) {
     return await fetchAPI('/api/scan', {
         method: 'POST',
-        body: JSON.stringify({ target, scripts })
+        body: JSON.stringify({ target, scripts, discover, discovery_only: discoveryOnly })
     });
 }
 
@@ -603,11 +609,37 @@ async function startScan() {
     closeScanModal();
 
     // Start scan via API
-    const result = await startScanAPI(target, selectedScripts);
+    const result = await startScanAPI(target, selectedScripts, false, false);
 
     if (result && result.scan_id) {
         await loadDashboardData();
         // Switch to dashboard to see the running scan
+        window.location.hash = 'dashboard';
+    }
+}
+
+// ===== Discovery Functions =====
+function openDiscoveryModal() {
+    elements.discoveryModal.classList.add('active');
+    if (elements.discoveryTarget) {
+        elements.discoveryTarget.value = elements.defaultTargetInput.value || '';
+    }
+}
+
+function closeDiscoveryModal() {
+    elements.discoveryModal.classList.remove('active');
+}
+
+async function startDiscoveryTask() {
+    const target = elements.discoveryTarget.value || elements.defaultTargetInput.value || 'localhost';
+
+    closeDiscoveryModal();
+
+    // Start discovery via API (no scripts, discover=false, discoveryOnly=true)
+    const result = await startScanAPI(target, [], false, true);
+
+    if (result && result.scan_id) {
+        await loadDashboardData();
         window.location.hash = 'dashboard';
     }
 }
@@ -721,11 +753,17 @@ elements.envSelect?.addEventListener('change', (e) => {
     window.location.href = newUrl.toString();
 });
 
+// Discovery Listeners
+elements.fastDiscoveryBtn?.addEventListener('click', openDiscoveryModal);
+elements.closeDiscoveryModalBtn?.addEventListener('click', closeDiscoveryModal);
+elements.cancelDiscoveryBtn?.addEventListener('click', closeDiscoveryModal);
+elements.startDiscoveryBtn?.addEventListener('click', startDiscoveryTask);
+
 // ===== Initialize =====
 async function initializeDashboard() {
     await loadScripts();
-    await loadEnvironments(); // Load environments first
-    await loadDashboardData();
+    const currentEnv = await loadEnvironments(); // Load environments first and get current env
+    await loadDashboardData(currentEnv); // Pass the current env to ensure consistent data
     handleRouting();
 
     window.addEventListener('resize', () => {

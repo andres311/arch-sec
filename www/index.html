@@ -64,6 +64,9 @@
                 <button class="btn btn-primary" id="run-scan">
                     <span>▶</span> Run Scan
                 </button>
+                <button class="btn btn-info" id="fast-discovery" style="background-color: #6366f1;">
+                    <span>🌐</span> Fast Discovery
+                </button>
                 <button class="btn btn-secondary" id="refresh-data">
                     <span>🔄</span> Refresh
                 </button>
@@ -285,6 +288,7 @@
                     <label for="target-input">Target (IP or hostname)</label>
                     <input type="text" id="target-input" placeholder="192.168.1.1 or example.com">
                 </div>
+
                 <div class="form-group">
                     <label>Select Scripts</label>
                     <div class="script-checkboxes" id="script-checkboxes">
@@ -295,6 +299,34 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancel-scan">Cancel</button>
                 <button class="btn btn-primary" id="start-scan">Start Scan</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Discovery Modal -->
+    <div class="modal" id="discovery-modal">
+        <div class="modal-content" style="max-width: 450px;">
+            <div class="modal-header">
+                <h2>Fast Network Discovery</h2>
+                <button class="modal-close" id="close-discovery-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 20px; color: #ccc;">Enter a network range to identify active devices and
+                    populate the Network Map. This process is passive and extremely fast.</p>
+                <div class="form-group">
+                    <label for="discovery-target">Network Range (CIDR or IP)</label>
+                    <input type="text" id="discovery-target" placeholder="e.g. 192.168.1.0/24">
+                </div>
+                <div class="modal-footer"
+                    style="padding: 20px 0 0 0; display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn btn-primary" id="start-discovery"
+                        style="width: 100%; background-color: #6366f1;">
+                        Start Discovery
+                    </button>
+                    <button class="btn btn-secondary" id="cancel-discovery" style="width: 100%;">
+                        Cancel
+                    </button>
+                </div>
             </div>
         </div>
     </div>

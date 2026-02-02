@@ -302,6 +302,9 @@ class APIHandler(SimpleHTTPRequestHandler):
                 results['issues'].extend(parsed.get('issues', []))
                 
                 # Track hosts
+                if 'target' in parsed and parsed['target'] != 'Unknown':
+                    hosts_found.add(parsed['target'])
+                    
                 for issue in parsed.get('issues', []):
                     if 'host' in issue:
                         hosts_found.add(issue['host'])
@@ -615,6 +618,10 @@ class APIHandler(SimpleHTTPRequestHandler):
         """Start a security scan."""
         target = data.get('target', 'localhost')
         scripts = data.get('scripts', [])
+        target = data.get('target', 'localhost')
+        scripts = data.get('scripts', [])
+        discover = data.get('discover', False)
+        discovery_only = data.get('discovery_only', False)
         
         if not scripts:
             # Default to a few quick scans
@@ -624,68 +631,100 @@ class APIHandler(SimpleHTTPRequestHandler):
         
         # Run scans in background thread
         def run_scans():
-            # Initialize script details
-            script_details = []
-            for s in scripts:
-                script_details.append({
-                    'name': s,
-                    'status': 'pending'
-                })
-
-            active_scans[scan_id] = {
-                'id': scan_id,
-                'status': 'running',
-                'target': target,
-                'scripts': scripts,
-                'script_details': script_details,
-                'started': datetime.now().isoformat(),
-                'completed': 0,
-                'total': len(scripts)
-            }
-            
-            for i, script in enumerate(scripts):
-                script_path = SCRIPTS_DIR / script
+            if discover or discovery_only:
+                # DISCOVERY MODE: Delegate to worker.py
+                active_scans[scan_id] = {
+                    'id': scan_id,
+                    'status': 'running',
+                    'target': target,
+                    'scripts': ['Network Discovery & Scan'] if not discovery_only else ['Network Discovery (Fast)'],
+                    'script_details': [{'name': 'Network Discovery', 'status': 'running'}],
+                    'started': datetime.now().isoformat(),
+                    'completed': 0,
+                    'total': 1
+                }
                 
-                # Update status to running
-                active_scans[scan_id]['script_details'][i]['status'] = 'running'
+                # Sanitize target for safety
+                safe_target = "".join([c for c in target if c.isalnum() or c in ('-', '_', '.', '/')]).strip()
                 
-                if script_path.exists():
-                    try:
-                        # Determine environment directory
-                        # Re-detect network for each script to ensure accuracy if moving
-                        current_network = self.get_current_network()
-                        
-                        env_dir = REPORTS_DIR / current_network
-                        env_dir.mkdir(exist_ok=True)
-                        
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                        # Sanitize target for filename
-                        safe_target = "".join([c for c in target if c.isalnum() or c in ('-', '_', '.')]).strip()
-                        output_file = env_dir / f"{script_path.stem}_{safe_target}_{timestamp}.txt"
-                        
-                        result = subprocess.run(
-                            [str(script_path), target],
-                            capture_output=True,
-                            text=True,
-                            timeout=300  # 5 min timeout
-                        )
-                        
-                        with open(output_file, 'w') as f:
-                            f.write(f"Target: {target}\n")
-                            f.write(f"Script: {script}\n")
-                            f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                            f.write("=" * 50 + "\n\n")
-                            f.write(result.stdout)
-                            if result.stderr:
-                                f.write("\nErrors:\n" + result.stderr)
-                        
-                        active_scans[scan_id]['completed'] += 1
-                        active_scans[scan_id]['script_details'][i]['status'] = 'completed'
-                    except Exception as e:
-                        print(f"Error running {script}: {e}")
-                        active_scans[scan_id]['script_details'][i]['status'] = 'failed'
+                # Command to run worker with discovery
+                cmd = [sys.executable, 'worker.py', '-t', safe_target, '--config', 'config.yaml', '--parallel', '4']
+                
+                if discovery_only:
+                    cmd.append('--discovery-only')
                 else:
-                     active_scans[scan_id]['script_details'][i]['status'] = 'skipped'
+                    cmd.append('--discover')
+                
+                try:
+                    subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+                    
+                    active_scans[scan_id]['script_details'][0]['status'] = 'completed'
+                    active_scans[scan_id]['completed'] = 1
+                except Exception as e:
+                    print(f"Error running discovery worker: {e}")
+                    active_scans[scan_id]['script_details'][0]['status'] = 'failed'
+            
+            else:
+                # STANDARD MODE: Run selected scripts individually
+                # Initialize script details
+                script_details = []
+                for s in scripts:
+                    script_details.append({
+                        'name': s,
+                        'status': 'pending'
+                    })
+
+                active_scans[scan_id] = {
+                    'id': scan_id,
+                    'status': 'running',
+                    'target': target,
+                    'scripts': scripts,
+                    'script_details': script_details,
+                    'started': datetime.now().isoformat(),
+                    'completed': 0,
+                    'total': len(scripts)
+                }
+                
+                for i, script in enumerate(scripts):
+                    script_path = SCRIPTS_DIR / script
+                    
+                    # Update status to running
+                    active_scans[scan_id]['script_details'][i]['status'] = 'running'
+                    
+                    if script_path.exists():
+                        try:
+                            # Re-detect network
+                            current_network = self.get_current_network()
+                            env_dir = REPORTS_DIR / current_network
+                            env_dir.mkdir(exist_ok=True)
+                            
+                            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                            safe_target = "".join([c for c in target if c.isalnum() or c in ('-', '_', '.')]).strip()
+                            output_file = env_dir / f"{script_path.stem}_{safe_target}_{timestamp}.txt"
+                            
+                            result = subprocess.run(
+                                [str(script_path), target],
+                                capture_output=True,
+                                text=True,
+                                timeout=300
+                            )
+                            
+                            with open(output_file, 'w') as f:
+                                f.write(f"Target: {target}\n")
+                                f.write(f"Script: {script}\n")
+                                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                                f.write("=" * 50 + "\n\n")
+                                f.write(result.stdout)
+                                if result.stderr:
+                                    f.write("\nErrors:\n" + result.stderr)
+                            
+                            active_scans[scan_id]['completed'] += 1
+                            active_scans[scan_id]['script_details'][i]['status'] = 'completed'
+                        except Exception as e:
+                            print(f"Error running {script}: {e}")
+                            active_scans[scan_id]['script_details'][i]['status'] = 'failed'
+                    else:
+                         active_scans[scan_id]['script_details'][i]['status'] = 'skipped'
             
             active_scans[scan_id]['status'] = 'completed'
             active_scans[scan_id]['finished'] = datetime.now().isoformat()
