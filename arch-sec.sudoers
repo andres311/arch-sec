@@ -1,0 +1,38 @@
+# /etc/sudoers.d/arch-sec
+# Passwordless sudo for Arch-Sec Security Scanner
+#
+# INSTALLATION:
+#   sudo cp arch-sec.sudoers /etc/sudoers.d/arch-sec
+#   sudo chmod 0440 /etc/sudoers.d/arch-sec
+#
+# Replace YOUR_USERNAME below with your actual username, or
+# uncomment the group-based rules and create the arch-sec group.
+
+# ============================================================
+# Option A: User-based permissions (replace YOUR_USERNAME)
+# ============================================================
+
+YOUR_USERNAME   ALL = NOPASSWD: /usr/bin/arp-scan
+YOUR_USERNAME   ALL = NOPASSWD: /usr/sbin/arp-scan
+YOUR_USERNAME   ALL = NOPASSWD: /usr/bin/masscan
+YOUR_USERNAME   ALL = NOPASSWD: /usr/bin/netdiscover
+YOUR_USERNAME   ALL = NOPASSWD: /usr/bin/hping3
+YOUR_USERNAME   ALL = NOPASSWD: /usr/bin/nmap
+YOUR_USERNAME   ALL = NOPASSWD: /usr/bin/lynis
+
+# ============================================================
+# Option B: Group-based permissions (recommended for multi-user)
+# ============================================================
+# Create group: sudo groupadd arch-sec
+# Add user:     sudo usermod -aG arch-sec YOUR_USERNAME
+# Then uncomment these lines and comment out Option A above:
+
+# %arch-sec   ALL = NOPASSWD: /usr/bin/arp-scan
+# %arch-sec   ALL = NOPASSWD: /usr/sbin/arp-scan
+# %arch-sec   ALL = NOPASSWD: /usr/bin/masscan
+# %arch-sec   ALL = NOPASSWD: /usr/bin/netdiscover
+# %arch-sec   ALL = NOPASSWD: /usr/bin/hping3
+# %arch-sec   ALL = NOPASSWD: /usr/bin/nmap
+# %arch-sec   ALL = NOPASSWD: /usr/bin/lynis
+
+# end of file
