@@ -490,12 +490,14 @@ async function updateActiveScans() {
 }
 
 function renderActiveScans(scans) {
-    const activeScansContainer = document.getElementById('active-scans-container');
-    if (!activeScansContainer) {
-        // Create container if it doesn't exist (insert before recent scans)
+    let activeScansCard = document.getElementById('active-scans-container');
+
+    // Create container if it doesn't exist (insert before recent scans)
+    if (!activeScansCard) {
         const scansCard = document.querySelector('.scans-card');
         if (scansCard) {
             const newCard = document.createElement('div');
+            newCard.id = 'active-scans-container';  // Add ID so we can find it later
             newCard.className = 'card active-scans-card';
             newCard.style.marginBottom = '20px';
             newCard.innerHTML = `
@@ -503,8 +505,11 @@ function renderActiveScans(scans) {
                 <div class="active-scans-list" id="active-scans-list"></div>
             `;
             scansCard.parentNode.insertBefore(newCard, scansCard);
+            activeScansCard = newCard;
         }
     }
+
+    if (!activeScansCard) return;
 
     const listElement = document.getElementById('active-scans-list');
     if (!listElement) return;
@@ -512,11 +517,13 @@ function renderActiveScans(scans) {
     const runningScans = scans.filter(s => s.status === 'running');
 
     if (runningScans.length === 0) {
-        // If container exists but no running scans, maybe hide it?
-        // For now, let's just clear it or show "None"
-        listElement.innerHTML = '<p class="text-muted" style="padding:10px;font-size:0.9em;">No active scans running.</p>';
+        // Hide the entire card when no scans are running
+        activeScansCard.style.display = 'none';
         return;
     }
+
+    // Show the card when there are running scans
+    activeScansCard.style.display = '';
 
     listElement.innerHTML = runningScans.map(scan => {
         const completed = scan.completed || 0;
