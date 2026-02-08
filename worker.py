@@ -21,10 +21,22 @@ DEFAULT_CONFIG = {
     'scripts_dir': 'scripts',
     'reports_dir': 'reports',
     'logs_dir': 'logs',
+    'command_logs_dir': 'command_logs',
     'scan_interval': 3600,  # 1 hour in seconds
     'default_target': 'localhost',
     'parallelism': 2
 }
+
+# Scripts that require root/sudo privileges
+# These will be executed with 'sudo' prefix
+SUDO_SCRIPTS = [
+    'arpscan_scan.sh',
+    'masscan_scan.sh',
+    'netdiscover_scan.sh',
+    'hping3_scan.sh',
+    'nmap_scan.sh',      # For OS detection (-O) and SYN scans (-sS)
+    'lynis_audit.sh',    # For full system audit
+]
 
 
 def get_current_network() -> str:
@@ -126,6 +138,27 @@ def setup_logging(logs_dir: str) -> logging.Logger:
     return logger
 
 
+def log_command(cmd_list: list, environment: str, config: dict):
+    """Log a shell command to the environment-specific log file."""
+    try:
+        command_logs_dir = Path(config.get('command_logs_dir', 'command_logs'))
+        command_logs_dir.mkdir(exist_ok=True)
+        
+        env_name = environment if environment else "Unknown_Network"
+        # Sanitize env name
+        safe_env = "".join([c for c in env_name if c.isalnum() or c in ('-', '_')]).strip()
+        log_file = command_logs_dir / f"{safe_env}.log"
+        
+        timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        cmd_str = ' '.join(cmd_list)
+        
+        with open(log_file, 'a') as f:
+            f.write(f"[{timestamp}] {cmd_str}\n")
+            
+    except Exception as e:
+        print(f"Error logging command: {e}")
+
+
 def load_config(config_path: str) -> dict:
     """Load configuration from YAML file."""
     if os.path.exists(config_path):
@@ -149,7 +182,7 @@ def get_scripts(scripts_dir: str) -> list:
     return sorted(scripts)
 
 
-def discover_devices(target_network: str, logger: logging.Logger, dry_run: bool = False) -> list:
+def discover_devices(target_network: str, logger: logging.Logger, config: dict, dry_run: bool = False, environment: str = None) -> list:
     """Discover active devices on the network using nmap."""
     logger.info(f"Discovering devices on {target_network}...")
     
@@ -162,6 +195,10 @@ def discover_devices(target_network: str, logger: logging.Logger, dry_run: bool 
         # -sn: Ping Scan - disable port scan
         # -n: Never do DNS resolution (faster)
         cmd = ['nmap', '-sn', '-n', target_network]
+        
+        # Log command
+        log_command(cmd, environment if environment else get_current_network(), config)
+        
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         
         if result.returncode != 0:
@@ -183,13 +220,110 @@ def discover_devices(target_network: str, logger: logging.Logger, dry_run: bool 
         return []
 
 
-def execute_script(script_path: Path, target: str, reports_dir: str, logger: logging.Logger, dry_run: bool = False) -> bool:
+def discover_devices_detailed(target_network: str, reports_dir: str, logger: logging.Logger, config: dict, dry_run: bool = False, environment: str = None) -> list:
+    """Discover active devices with details using nmap -O --script=smb-os-discovery,snmp-info."""
+    logger.info(f"Running detailed discovery on {target_network}...")
+    
+    # We need to run this as a scan that produces a report, not just returning a list of hosts
+    # The output is complex, so we'll save the whole nmap output as a report
+    
+    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+    current_network = environment if environment else get_current_network()
+    env_reports_dir = Path(reports_dir) / current_network
+    env_reports_dir.mkdir(parents=True, exist_ok=True)
+    
+    safe_target = target_network.replace('/', '_').replace(':', '_')
+    report_file = env_reports_dir / f"nmap_detailed_discovery_{safe_target}_{timestamp}.txt"
+    
+    cmd = ['sudo', '-n', 'nmap', '-T4', '-F', '-O', '--script=smb-os-discovery,snmp-info', target_network]
+    
+    logger.info(f"{'[DRY-RUN] ' if dry_run else ''}Executing detailed discovery: {' '.join(cmd)}")
+    
+    if dry_run:
+        return []
+
+    try:
+        # Log command
+        log_command(cmd, current_network, config)
+
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=1200) # 20 mins timeout
+        
+        # Save report
+        with open(report_file, 'w') as f:
+            f.write(f"Detailed Network Discovery Report\n")
+            f.write(f"{'=' * 50}\n")
+            f.write(f"Command: {' '.join(cmd)}\n")
+            f.write(f"Target: {target_network}\n")
+            f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+            f.write(f"{'=' * 50}\n\n")
+            f.write(result.stdout)
+            if result.stderr:
+                f.write("\nSTDERR:\n")
+                f.write(result.stderr)
+        
+        logger.info(f"Detailed discovery complete. Report saved to {report_file}")
+        
+        # Parse hosts and split output into individual reports
+        hosts = []
+        current_host_output = []
+        current_host_ip = None
+        
+        lines = result.stdout.splitlines()
+        for i, line in enumerate(lines):
+            # Check for new host block
+            match = re.search(r'Nmap scan report for (\S+)', line)
+            if match:
+                # Save previous host details if any
+                if current_host_ip and current_host_output:
+                     save_host_report(current_host_ip, current_host_output, reports_dir, environment, timestamp, cmd)
+                
+                # Start new host
+                current_host_ip = match.group(1)
+                hosts.append(current_host_ip)
+                current_host_output = [line]
+            else:
+                if current_host_ip:
+                    current_host_output.append(line)
+        
+        # Save last host
+        if current_host_ip and current_host_output:
+             save_host_report(current_host_ip, current_host_output, reports_dir, environment, timestamp, cmd)
+        
+        return hosts
+        
+    except Exception as e:
+        logger.error(f"Detailed discovery error: {e}")
+        return []
+
+def save_host_report(host, lines, reports_dir, environment, timestamp, cmd):
+    """Save a specific host's nmap output segment as a report."""
+    try:
+        current_network = environment if environment else get_current_network()
+        env_reports_dir = Path(reports_dir) / current_network
+        
+        # Sanitize host
+        safe_host = host.replace('/', '_').replace(':', '_')
+        # Use 'nmap_' prefix so server.py parses it with parse_nmap
+        report_file = env_reports_dir / f"nmap_detailed_{safe_host}_{timestamp}.txt"
+        
+        with open(report_file, 'w') as f:
+            f.write(f"Target: {host}\n")
+            f.write(f"Command: {' '.join(cmd)}\n")
+            f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+            f.write(f"{'=' * 50}\n\n")
+            f.write("\n".join(lines))
+            
+    except Exception as e:
+        print(f"Error saving host report: {e}")
+
+
+def execute_script(script_path: Path, target: str, reports_dir: str, logger: logging.Logger, config: dict, dry_run: bool = False, environment: str = None) -> bool:
     """Execute a security script and capture output."""
     script_name = script_path.stem
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     
     # Determine environment
-    current_network = get_current_network()
+    current_network = environment if environment else get_current_network()
     env_reports_dir = Path(reports_dir) / current_network
     env_reports_dir.mkdir(parents=True, exist_ok=True)
     
@@ -197,16 +331,29 @@ def execute_script(script_path: Path, target: str, reports_dir: str, logger: log
     safe_target = target.replace('/', '_').replace(':', '_')
     report_file = env_reports_dir / f"{script_name}_{safe_target}_{timestamp}.txt"
     
-    logger.info(f"{'[DRY-RUN] ' if dry_run else ''}Executing: {script_path.name} against target: {target}")
+    # Check if this script requires sudo
+    needs_sudo = script_path.name in SUDO_SCRIPTS
+    
+    # Build command
+    if needs_sudo:
+        cmd = ['sudo', '-n', str(script_path), target]  # -n: non-interactive (no password prompt)
+        logger.info(f"{'[DRY-RUN] ' if dry_run else ''}Executing with sudo: {script_path.name} against target: {target}")
+    else:
+        cmd = [str(script_path), target]
+        logger.info(f"{'[DRY-RUN] ' if dry_run else ''}Executing: {script_path.name} against target: {target}")
     
     if dry_run:
+        logger.info(f"[DRY-RUN] Command: {' '.join(cmd)}")
         logger.info(f"[DRY-RUN] Would save output to: {report_file}")
         return True
     
+    # Log command
+    log_command(cmd, current_network, config)
+
     try:
-        # Execute the script with target as argument
+        # Execute the script
         result = subprocess.run(
-            [str(script_path), target],
+            cmd,
             capture_output=True,
             text=True,
             timeout=3600  # 1 hour timeout
@@ -245,7 +392,7 @@ def execute_script(script_path: Path, target: str, reports_dir: str, logger: log
         return False
 
 
-def run_worker(config: dict, logger: logging.Logger, target: str = None, dry_run: bool = False, continuous: bool = False, discover: bool = False, parallelism: int = 2, discovery_only: bool = False):
+def run_worker(config: dict, logger: logging.Logger, target: str = None, dry_run: bool = False, continuous: bool = False, discover: bool = False, parallelism: int = 2, discovery_only: bool = False, detailed: bool = False, environment: str = None):
     """Main worker loop."""
     scripts_dir = config['scripts_dir']
     reports_dir = config['reports_dir']
@@ -258,10 +405,12 @@ def run_worker(config: dict, logger: logging.Logger, target: str = None, dry_run
     logger.info(f"Scripts Directory: {scripts_dir}")
     logger.info(f"Reports Directory: {reports_dir}")
     logger.info(f"Target: {target}")
-    logger.info(f"Environment: {get_current_network()}")
+    logger.info(f"Environment: {environment if environment else get_current_network()}")
     logger.info(f"Mode: {'Continuous' if continuous else 'Single Run'}")
     logger.info(f"Discovery: {'Enabled' if discover or discovery_only else 'Disabled'}")
+    logger.info(f"Discovery: {'Enabled' if discover or discovery_only else 'Disabled'}")
     logger.info(f"Discovery Only: {'Yes' if discovery_only else 'No'}")
+    logger.info(f"Detailed Mode: {'Yes' if detailed else 'No'}")
     logger.info(f"Parallelism: {parallelism}")
     if dry_run:
         logger.info("DRY-RUN MODE - No scripts will be executed")
@@ -276,7 +425,10 @@ def run_worker(config: dict, logger: logging.Logger, target: str = None, dry_run
         else:
             targets = [target]
             if discover or discovery_only:
-                targets = discover_devices(target, logger, dry_run)
+                if detailed:
+                    targets = discover_devices_detailed(target, reports_dir, logger, config, dry_run, environment)
+                else:
+                    targets = discover_devices(target, logger, config, dry_run, environment)
             
             if not targets:
                 logger.warning("No targets to scan.")
@@ -285,26 +437,31 @@ def run_worker(config: dict, logger: logging.Logger, target: str = None, dry_run
                 
                 if discovery_only:
                     # Just generate discovery reports
-                    for host in targets:
-                        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                        current_network = get_current_network()
-                        env_reports_dir = Path(reports_dir) / current_network
-                        env_reports_dir.mkdir(parents=True, exist_ok=True)
-                        
-                        safe_target = host.replace('/', '_').replace(':', '_')
-                        report_file = env_reports_dir / f"network_discovery_{safe_target}_{timestamp}.txt"
-                        
-                        logger.info(f"Generatng discovery report for {host}")
-                        
-                        if not dry_run:
-                            with open(report_file, 'w') as f:
-                                f.write(f"Target: {host}\n")
-                                f.write(f"Network: {current_network}\n")
-                                f.write(f"Scanner: NetworkDiscovery\n")
-                                f.write(f"Timestamp: {datetime.now().isoformat()}\n")
-                                f.write(f"Status: Online\n")
-                                f.write("=" * 50 + "\n\n")
-                                f.write(f"Host {host} is active on the network.")
+                    # If detailed scan was run, the report is already generated in discover_devices_detailed
+                    # But we might want simple connection reports for each host too?
+                    # Let's simple skip if detailed, as that report covers it.
+                    
+                    if not detailed:
+                        for host in targets:
+                            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                            current_network = environment if environment else get_current_network()
+                            env_reports_dir = Path(reports_dir) / current_network
+                            env_reports_dir.mkdir(parents=True, exist_ok=True)
+                            
+                            safe_target = host.replace('/', '_').replace(':', '_')
+                            report_file = env_reports_dir / f"network_discovery_{safe_target}_{timestamp}.txt"
+                            
+                            logger.info(f"Generatng discovery report for {host}")
+                            
+                            if not dry_run:
+                                with open(report_file, 'w') as f:
+                                    f.write(f"Target: {host}\n")
+                                    f.write(f"Network: {current_network}\n")
+                                    f.write(f"Scanner: NetworkDiscovery\n")
+                                    f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+                                    f.write(f"Status: Online\n")
+                                    f.write("=" * 50 + "\n\n")
+                                    f.write(f"Host {host} is active on the network.")
                     
                     logger.info("Discovery complete.")
                 
@@ -316,7 +473,13 @@ def run_worker(config: dict, logger: logging.Logger, target: str = None, dry_run
                     def scan_host(host):
                         logger.info(f"Scanning host: {host}")
                         for script in scripts:
-                            execute_script(script, host, reports_dir, logger, dry_run)
+                            # Note: execute_script needs to be updated too, but we didn't pass environment arg to it in plan?
+                            # Actually, execute_script auto-detects. We should update it if we want strict adherence.
+                            # But execute_script is hardcoded to get_current_network().
+                            # Let's override it by monkeypatching or just modifying it?
+                            # Better: modify execute_script signature too.
+                            # Better: modify execute_script signature too.
+                            execute_script(script, host, reports_dir, logger, config, dry_run, environment)
                     
                     # Execute in parallel
                     try:
@@ -361,9 +524,11 @@ Examples:
     parser.add_argument('-c', '--continuous', action='store_true', help='Run continuously')
     parser.add_argument('--discover', action='store_true', help='Discover devices on network (treat target as network range)')
     parser.add_argument('--discovery-only', action='store_true', help='Only discover devices, do not run security scripts')
+    parser.add_argument('--detailed', action='store_true', help='Run detailed discovery with OS/Service detection (requires sudo)')
     parser.add_argument('--parallel', type=int, default=2, help='Number of parallel hosts to scan')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be executed without running')
     parser.add_argument('--config', default='config.yaml', help='Path to config file')
+    parser.add_argument('--environment', help='Specify environment/network name explicitly')
     
     args = parser.parse_args()
     
@@ -378,7 +543,7 @@ Examples:
     logger = setup_logging(config['logs_dir'])
     
     try:
-        run_worker(config, logger, args.target, args.dry_run, args.continuous, args.discover, args.parallel, args.discovery_only)
+        run_worker(config, logger, args.target, args.dry_run, args.continuous, args.discover, args.parallel, args.discovery_only, args.detailed, args.environment)
     except KeyboardInterrupt:
         logger.info("Worker stopped by user")
         sys.exit(0)

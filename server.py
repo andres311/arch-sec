@@ -130,22 +130,30 @@ class APIHandler(SimpleHTTPRequestHandler):
             })
         return sorted(scripts, key=lambda x: x['name'])
     
-    def get_current_network(self):
-        """Get the current network ID (SSID or Interface Name)."""
-        # Method 1: iwgetid (Fastest, reliable for wifi)
+    def log_command(self, cmd_list, environment):
+        """Log a shell command to the environment-specific log file."""
         try:
-            result = subprocess.run(
-                ['iwgetid', '-r'], 
-                capture_output=True, 
-                text=True, 
-                timeout=2
-            )
-            ssid = result.stdout.strip()
-            if ssid:
-                return ssid
-        except Exception:
-            pass
+            command_logs_dir = Path('command_logs')
+            command_logs_dir.mkdir(exist_ok=True)
             
+            env_name = environment if environment else "Unknown_Network"
+            # Sanitize env name
+            safe_env = "".join([c for c in env_name if c.isalnum() or c in ('-', '_')]).strip()
+            log_file = command_logs_dir / f"{safe_env}.log"
+            
+            timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            cmd_str = ' '.join(cmd_list)
+            
+            with open(log_file, 'a') as f:
+                f.write(f"[{timestamp}] {cmd_str}\n")
+                
+        except Exception as e:
+            print(f"Error logging command: {e}")
+
+    def get_active_networks(self):
+        """Get list of all active network IDs (SSID or Interface Name)."""
+        networks = []
+        
         # Method 2: nmcli connection show --active (Robust for NetworkManager)
         try:
             result = subprocess.run(
@@ -160,44 +168,32 @@ class APIHandler(SimpleHTTPRequestHandler):
             for line in result.stdout.splitlines():
                 parts = line.split(':')
                 if len(parts) >= 2:
-                    active_cons.append((parts[0], parts[1]))
+                    name = parts[0]
+                    type_ = parts[1]
+                    # Filter out lo, docker, etc if needed, but for now include all real connections
+                    if type_ in ['802-11-wireless', 'wifi', 'wlan', '802-3-ethernet', 'ethernet', 'wired']:
+                        if name not in networks:
+                            networks.append(name)
+            
+        except Exception:
+            pass
 
-            # Check for WiFi
-            for name, type_ in active_cons:
-                if type_ in ['802-11-wireless', 'wifi', 'wlan']:
-                    return name
-            
-            # Check for Wired/Ethernet (User requested custom interface names e.g. eth-data)
-            for name, type_ in active_cons:
-                if type_ in ['802-3-ethernet', 'ethernet', 'wired']:
-                    return name
-            
-            # Fallback: Return first active connection
-            if active_cons:
-                return active_cons[0][0]
+        # Fallback to legacy if list is empty
+        if not networks:
+            legacy = self.get_current_network()
+            if legacy != "Unknown_Network":
+                networks.append(legacy)
                 
-        except Exception:
-            pass
+        return networks
 
-        # Method 3: nmcli dev wifi (Legacy fallback)
-        try:
-            result = subprocess.run(
-                ['nmcli', '-t', '-f', 'ACTIVE,SSID', 'dev', 'wifi'],
-                capture_output=True, 
-                text=True, 
-                timeout=3
-            )
-            for line in result.stdout.splitlines():
-                if line.startswith('yes:'):
-                    return line.split(':', 1)[1].strip()
-        except Exception:
-            pass
-        
-        return "Unknown_Network"
+    def get_current_network(self):
+        """Get the primary current network ID (SSID or Interface Name). (Legacy/Fallback)"""
+        networks = self.get_active_networks()
+        return networks[0] if networks else "Unknown_Network"
 
     def get_environments(self):
         """Get list of environments with status."""
-        current_net = self.get_current_network()
+        active_networks = self.get_active_networks()
         envs = []
         
         # Get all subdirectories in reports
@@ -207,8 +203,8 @@ class APIHandler(SimpleHTTPRequestHandler):
                 if item.is_dir():
                     existing_envs.add(item.name)
         
-        # Add current network if not exists
-        all_envs = existing_envs.union({current_net})
+        # Add current networks if not exists
+        all_envs = existing_envs.union(set(active_networks))
         
         # Available networks (visible via nmcli) - Optional enhancement
         # For now, we'll stick to history + current
@@ -216,7 +212,7 @@ class APIHandler(SimpleHTTPRequestHandler):
         for env_name in all_envs:
             envs.append({
                 'name': env_name,
-                'is_current': env_name == current_net,
+                'is_current': env_name in active_networks,
                 'has_records': env_name in existing_envs
             })
             
@@ -292,22 +288,33 @@ class APIHandler(SimpleHTTPRequestHandler):
              reports = list(REPORTS_DIR.rglob('*.txt'))
 
         hosts_found = set()
+        hosts_info = {}  # Store OS, ports, etc.
         
         for report in reports[:50]:  # Limit to 50 most recent
             try:
                 content = report.read_text(errors='ignore')
-                parsed = self.parse_report(report.name, content)
+                
+                # Parse
+                parsed, details = self.parse_report(report.name, content)
                 
                 # Add issues
                 results['issues'].extend(parsed.get('issues', []))
                 
-                # Track hosts
-                if 'target' in parsed and parsed['target'] != 'Unknown':
-                    hosts_found.add(parsed['target'])
-                    
-                for issue in parsed.get('issues', []):
-                    if 'host' in issue:
-                        hosts_found.add(issue['host'])
+                # Collect host details
+                target = parsed.get('target', 'Unknown')
+                if target != 'Unknown':
+                    hosts_found.add(target)
+                    if details:
+                        # Merge details if we have multiple reports for same host
+                        if target not in hosts_info:
+                            hosts_info[target] = details.copy()
+                        else:
+                            if details.get('os') != 'Unknown':
+                                hosts_info[target]['os'] = details['os']
+                            if details.get('ports'):
+                                existing_ports = set(hosts_info[target].get('ports', []))
+                                new_ports = set(details['ports'])
+                                hosts_info[target]['ports'] = list(existing_ports.union(new_ports))
                 
                 # Add to recent scans
                 stat = report.stat()
@@ -360,13 +367,18 @@ class APIHandler(SimpleHTTPRequestHandler):
             else:
                 status = 'safe'
             
+            # Get host details if available
+            details = hosts_info.get(host, {})
+            
             results['networkNodes'].append({
                 'id': f'host_{i}',
                 'label': host,
                 'icon': icon,
                 'x': pos[0],
                 'y': pos[1],
-                'status': status
+                'status': status,
+                'os': details.get('os', 'Unknown'),
+                'ports': details.get('ports', [])
             })
         
         # Add default node if no hosts found
@@ -410,6 +422,7 @@ class APIHandler(SimpleHTTPRequestHandler):
     def parse_report(self, filename, content):
         """Parse a report file and extract issues."""
         result = {'issues': [], 'target': 'Unknown'}
+        host_details = {}
         
         # Extract target from content
         target_match = re.search(r'Target:\s*(\S+)', content)
@@ -421,7 +434,10 @@ class APIHandler(SimpleHTTPRequestHandler):
         
         # Parse based on scanner type
         if 'nmap' in scanner:
-            result['issues'].extend(self.parse_nmap(content, result['target']))
+            new_issues, details = self.parse_nmap(content, result['target'])
+            result['issues'].extend(new_issues)
+            if details:
+                host_details = details
         elif 'nikto' in scanner:
             result['issues'].extend(self.parse_nikto(content, result['target']))
         elif 'sslscan' in scanner:
@@ -432,16 +448,52 @@ class APIHandler(SimpleHTTPRequestHandler):
             # Generic parsing for unknown scanners
             result['issues'].extend(self.parse_generic(content, result['target'], scanner))
         
-        return result
+        return result, host_details
     
     def parse_nmap(self, content, target):
         """Parse nmap output for issues."""
         issues = []
+        os_details = "Unknown"
+        open_ports = []
+        
+        # Extract OS details
+        os_match = re.search(r'OS details:\s*(.+)', content)
+        if os_match:
+            os_details = os_match.group(1).strip()
+        else:
+            # Fallback to Running:
+            running_match = re.search(r'Running:\s*(.+)', content)
+            if running_match:
+                os_details = running_match.group(1).strip()
+
+        # Check for SMB OS Discovery (often more accurate for Windows)
+        smb_os_match = re.search(r'\|\s+OS:\s*(.+)', content)
+        if smb_os_match:
+            smb_os = smb_os_match.group(1).strip()
+            # Prefer SMB OS if "Unknown" or if it looks more detailed
+            if os_details == "Unknown" or "Windows" in smb_os:
+                os_details = smb_os
+        
+        # Check for SMB Computer Name
+        smb_name_match = re.search(r'\|\s+Computer name:\s*(.+)', content)
+        if smb_name_match:
+            comp_name = smb_name_match.group(1).strip()
+            if comp_name and comp_name not in os_details:
+                os_details += f" | Name: {comp_name}"
+        
+        # Check for SNMP OS/Desc
+        snmp_match = re.search(r'sysDescr\.0:\s*(.+)', content)
+        if snmp_match:
+             snmp_os = snmp_match.group(1).strip()
+             if os_details == "Unknown":
+                 os_details = snmp_os
         
         # Find open ports
         port_pattern = re.compile(r'(\d+)/tcp\s+open\s+(\S+)')
         for match in port_pattern.finditer(content):
             port, service = match.groups()
+            open_ports.append(f"{port}/tcp ({service})")
+            
             # High-risk services
             if service in ['ftp', 'telnet', 'rsh', 'rlogin']:
                 issues.append({
@@ -472,8 +524,8 @@ class APIHandler(SimpleHTTPRequestHandler):
                 'scanner': 'nmap',
                 'timestamp': datetime.now().isoformat()
             })
-        
-        return issues
+            
+        return issues, {'os': os_details, 'ports': open_ports}
     
     def parse_nikto(self, content, target):
         """Parse nikto output for issues."""
@@ -622,6 +674,8 @@ class APIHandler(SimpleHTTPRequestHandler):
         scripts = data.get('scripts', [])
         discover = data.get('discover', False)
         discovery_only = data.get('discovery_only', False)
+        detailed = data.get('detailed', False)
+        environment = data.get('environment', None)
         
         if not scripts:
             # Default to a few quick scans
@@ -637,7 +691,11 @@ class APIHandler(SimpleHTTPRequestHandler):
                     'id': scan_id,
                     'status': 'running',
                     'target': target,
-                    'scripts': ['Network Discovery & Scan'] if not discovery_only else ['Network Discovery (Fast)'],
+                    'status': 'running',
+                    'target': target,
+                    'scripts': ['Network Discovery & Scan'] if not discovery_only else ['Network Discovery (Fast)' if not detailed else 'Network Discovery (Detailed)'],
+                    'script_details': [{'name': 'Network Discovery', 'status': 'running'}],
+                    'started': datetime.now().isoformat(),
                     'script_details': [{'name': 'Network Discovery', 'status': 'running'}],
                     'started': datetime.now().isoformat(),
                     'completed': 0,
@@ -655,7 +713,18 @@ class APIHandler(SimpleHTTPRequestHandler):
                 else:
                     cmd.append('--discover')
                 
+                if detailed:
+                    cmd.append('--detailed')
+                
+                if environment:
+                    cmd.append('--environment')
+                    cmd.append(environment)
+
                 try:
+                    # Log the worker command
+                    scan_env = environment if environment else self.get_current_network()
+                    self.log_command(cmd, scan_env)
+                    
                     subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
                     
                     active_scans[scan_id]['script_details'][0]['status'] = 'completed'
@@ -693,9 +762,9 @@ class APIHandler(SimpleHTTPRequestHandler):
                     
                     if script_path.exists():
                         try:
-                            # Re-detect network
-                            current_network = self.get_current_network()
-                            env_dir = REPORTS_DIR / current_network
+                            # Use provided environment or detect current
+                            scan_network = environment if environment else self.get_current_network()
+                            env_dir = REPORTS_DIR / scan_network
                             env_dir.mkdir(exist_ok=True)
                             
                             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')

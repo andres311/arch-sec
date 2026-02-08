@@ -317,6 +317,12 @@
                     <label for="discovery-target">Network Range (CIDR or IP)</label>
                     <input type="text" id="discovery-target" placeholder="e.g. 192.168.1.0/24">
                 </div>
+                <div class="form-group" style="margin-top: 10px;">
+                    <label class="checkbox-container" style="display: flex; align-items: center; cursor: pointer;">
+                        <input type="checkbox" id="discovery-detailed" style="width: auto; margin-right: 10px;">
+                        <span>Include OS & Service Details (Slower)</span>
+                    </label>
+                </div>
                 <div class="modal-footer"
                     style="padding: 20px 0 0 0; display: flex; flex-direction: column; gap: 10px;">
                     <button class="btn btn-primary" id="start-discovery"

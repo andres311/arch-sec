@@ -69,7 +69,9 @@ const elements = {
     closeDiscoveryModalBtn: document.getElementById('close-discovery-modal'),
     cancelDiscoveryBtn: document.getElementById('cancel-discovery'),
     startDiscoveryBtn: document.getElementById('start-discovery'),
-    discoveryTarget: document.getElementById('discovery-target')
+    startDiscoveryBtn: document.getElementById('start-discovery'),
+    discoveryTarget: document.getElementById('discovery-target'),
+    discoveryDetailed: document.getElementById('discovery-detailed')
 };
 
 // ===== API Functions =====
@@ -145,6 +147,11 @@ async function loadEnvironments() {
 
             const isSelected = selectedEnv === env.name ? 'selected' : '';
 
+            // If no env is selected in URL, default to the first active one
+            if (!selectedEnv && env.is_current) {
+                selectedEnv = env.name;
+            }
+
             return `<option value="${escapeHtml(env.name)}" class="${className}" ${isSelected}>${escapeHtml(label)}</option>`;
         }).join('');
     }
@@ -160,10 +167,10 @@ async function loadScripts() {
     }
 }
 
-async function startScanAPI(target, scripts, discover, discoveryOnly) {
+async function startScanAPI(target, scripts, discover, discoveryOnly, detailed = false, environment = null) {
     return await fetchAPI('/api/scan', {
         method: 'POST',
-        body: JSON.stringify({ target, scripts, discover, discovery_only: discoveryOnly })
+        body: JSON.stringify({ target, scripts, discover, discovery_only: discoveryOnly, detailed, environment })
     });
 }
 
@@ -378,8 +385,95 @@ function renderNetworkMap(nodes, container) {
         `;
 
         nodeEl.addEventListener('click', () => showNodeDetails(node));
+
+        // Tooltip events
+        nodeEl.addEventListener('mouseover', (e) => showNodeTooltip(e, node));
+        nodeEl.addEventListener('mousemove', (e) => updateTooltipPosition(e));
+        nodeEl.addEventListener('mouseout', hideNodeTooltip);
+
         container.appendChild(nodeEl);
     });
+}
+
+function showNodeTooltip(e, node) {
+    let tooltip = document.getElementById('network-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'network-tooltip';
+        tooltip.className = 'network-tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    // Format ports
+    let portsHtml = '';
+    if (node.ports && node.ports.length > 0) {
+        const displayPorts = node.ports.slice(0, 5);
+        portsHtml = `
+            <div class="tooltip-section">
+                <span class="tooltip-label">Open Ports:</span>
+                <div class="tooltip-ports">
+                    ${displayPorts.map(p => `<span class="port-tag">${p}</span>`).join('')}
+                    ${node.ports.length > 5 ? `<span class="port-more">+${node.ports.length - 5} more</span>` : ''}
+                </div>
+            </div>
+        `;
+    }
+
+    // Risk score approximation based on status
+    const riskScore = {
+        'critical': 90,
+        'high': 75,
+        'medium': 50,
+        'low': 25,
+        'safe': 0
+    }[node.status] || 0;
+
+    // Determine risk color class
+    const riskClass = node.status || 'safe';
+
+    tooltip.innerHTML = `
+        <div class="tooltip-header ${riskClass}">
+            <span class="tooltip-icon">${node.icon || '💻'}</span>
+            <div>
+                <div class="tooltip-title">${escapeHtml(node.label)}</div>
+                <div class="tooltip-subtitle">${node.status.toUpperCase()} Risk</div>
+            </div>
+            <div class="tooltip-score">${riskScore}</div>
+        </div>
+        <div class="tooltip-body">
+            <div class="tooltip-row">
+                <span class="tooltip-label">OS:</span>
+                <span class="tooltip-value">${escapeHtml(node.os || 'Unknown')}</span>
+            </div>
+            ${portsHtml}
+        </div>
+    `;
+
+    tooltip.style.display = 'block';
+    updateTooltipPosition(e);
+}
+
+function updateTooltipPosition(e) {
+    const tooltip = document.getElementById('network-tooltip');
+    if (tooltip) {
+        const x = e.clientX + 15;
+        const y = e.clientY + 15;
+
+        // Prevent going off screen
+        const rect = tooltip.getBoundingClientRect();
+        const maxX = window.innerWidth - rect.width - 10;
+        const maxY = window.innerHeight - rect.height - 10;
+
+        tooltip.style.left = `${Math.min(x, maxX)}px`;
+        tooltip.style.top = `${Math.min(y, maxY)}px`;
+    }
+}
+
+function hideNodeTooltip() {
+    const tooltip = document.getElementById('network-tooltip');
+    if (tooltip) {
+        tooltip.style.display = 'none';
+    }
 }
 
 function showNodeDetails(node) {
@@ -615,8 +709,11 @@ async function startScan() {
 
     closeScanModal();
 
+    // Get selected environment
+    const environment = elements.envSelect ? elements.envSelect.value : null;
+
     // Start scan via API
-    const result = await startScanAPI(target, selectedScripts, false, false);
+    const result = await startScanAPI(target, selectedScripts, false, false, false, environment);
 
     if (result && result.scan_id) {
         await loadDashboardData();
@@ -631,6 +728,9 @@ function openDiscoveryModal() {
     if (elements.discoveryTarget) {
         elements.discoveryTarget.value = elements.defaultTargetInput.value || '';
     }
+    if (elements.discoveryDetailed) {
+        elements.discoveryDetailed.checked = false;
+    }
 }
 
 function closeDiscoveryModal() {
@@ -639,11 +739,13 @@ function closeDiscoveryModal() {
 
 async function startDiscoveryTask() {
     const target = elements.discoveryTarget.value || elements.defaultTargetInput.value || 'localhost';
+    const detailed = elements.discoveryDetailed ? elements.discoveryDetailed.checked : false;
+    const environment = elements.envSelect ? elements.envSelect.value : null;
 
     closeDiscoveryModal();
 
-    // Start discovery via API (no scripts, discover=false, discoveryOnly=true)
-    const result = await startScanAPI(target, [], false, true);
+    // Start discovery via API (no scripts, discover=false, discoveryOnly=true, detailed=detailed, environment=environment)
+    const result = await startScanAPI(target, [], false, true, detailed, environment);
 
     if (result && result.scan_id) {
         await loadDashboardData();
