@@ -1,5 +1,9 @@
 # Arch-Sec: Kali Linux Security Scanner
 
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![CI](https://github.com/andres311/arch-sec/actions/workflows/ci.yml/badge.svg)](https://github.com/andres311/arch-sec/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
+
 A worker-based security scanning tool with **34 security scripts** covering network, web, DNS, authentication, and more.
 
 ## 🚀 Web Dashboard (Recommended)
